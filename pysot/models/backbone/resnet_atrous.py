@@ -382,6 +382,16 @@ class ResNet(nn.Module):
         p2 = self.layer2(p1)
         p3 = self.layer3(p2)
         p4 = self.layer4(p3)
+        '''
+        print("x:",x.shape)
+        print("x_:",x_.shape)
+        print("p1:",p1.shape)
+        print("p2:",p2.shape)
+        print("p3:",p3.shape)
+        print("p4:",p4.shape)
+        '''
+        
+        
         out = [x_, p1, p2, p3, p4]
         out = [out[i] for i in self.used_layers]
         if len(out) == 1:

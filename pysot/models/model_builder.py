@@ -10,7 +10,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from pysot.core.config import cfg
-from pysot.models.loss_car import make_siamcar_loss_evaluator
+from pysot.models.loss_car_multi import make_siamcar_loss_evaluator
 from pysot.models.backbone import get_backbone
 from pysot.models.head.car_head import CARHead
 from pysot.models.neck import get_neck
@@ -79,6 +79,7 @@ class ModelBuilder(nn.Module):
         search = data['search'].cuda()
         label_cls = data['label_cls'].cuda()
         label_loc = data['bbox'].cuda()
+        #print("bbox_model:",label_loc.shape)
 
         # get feature
         zf = self.backbone(template)

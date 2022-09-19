@@ -1,4 +1,5 @@
 # Copyright (c) SenseTime. All Rights Reserved.
+# depthwise 從7x7改15x15
 
 from __future__ import absolute_import
 from __future__ import division
@@ -18,10 +19,14 @@ class AdjustLayer(nn.Module):
 
     def forward(self, x):
         x = self.downsample(x)
+        
+        
         if x.size(3) < 20:
             l = 4
             r = l + 7
             x = x[:, :, l:r, l:r]
+         
+        
         return x
 
 

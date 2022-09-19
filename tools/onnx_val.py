@@ -1,68 +1,44 @@
-# Copyright (c) SenseTime. All Rights Reserved.
-
-from __future__ import (absolute_import, division, print_function,
-                        unicode_literals)
-
-import argparse
-import math
-import os
-import shutil
-import sys
-
-import cv2
-import numpy as np
+import time
 import torch
-
-sys.path.append('../')
-
-import ipdb
-import torchvision.transforms.functional as F
-from PIL import Image
+import cv2 
+import argparse
+import os
+import numpy as np
+import onnxruntime
 from pysot.core.config import cfg
-from pysot.models.model_builder import ModelBuilder
-from pysot.tracker.siamcar_tracker import SiamCARTracker
 from pysot.utils.bbox import get_axis_aligned_bbox
-from pysot.utils.model_load import load_pretrain
 from toolkit.datasets.testdata import ImageFolderWithSelect
-from torchvision import datasets, transforms
+from pysot.tracker.siamcar_tracker_openvino_onnx import SiamCARTracker
 
-parser = argparse.ArgumentParser(description='siamcar tracking')
-
-parser.add_argument('--datasetName', type=str, default='PCB',help='dataset name')#OTB100 LaSOT UAV123 GOT-10k
-parser.add_argument('--snapshot', type=str, default='./snapshot/checkpoint_e999.pth',help='snapshot of models to eval')
-parser.add_argument('--cfg', type=str, default='./experiments/siamcar_r50/config_test.yaml',help='config file')
-parser.add_argument('--dataset', default='./dataset/testing_dataset/DATA/', type=str, help='dataset')
-args = parser.parse_args()
-
-torch.set_num_threads(1)
-
-
-def main():
-     # load config
-    cfg.merge_from_file(args.cfg)
-
+def run_app():
+    """
+    Run Object Detection Application
+    :return:
+    """
+    cfg.merge_from_file(args.config)
     # hp_search
-    params = getattr(cfg.HP_SEARCH,args.datasetName)
-    hp = {'lr': params[0], 'penalty_k':params[1], 'window_lr':params[2]}
+    hp = {'lr': 0.4, 'penalty_k':0.2, 'window_lr':0.3}
 
-    model = ModelBuilder()
-
-    # load model
-    model = load_pretrain(model, args.snapshot).cuda().eval()
-
-    # build tracker
-    tracker = SiamCARTracker(model, cfg.TRACK)
-
-    # create dataset
+    # load dataset
     dataset = ImageFolderWithSelect(args.dataset)
-    assert len(dataset) != 0, "dataset is empty!!"
+    
+    # Load Network
+    device = torch.device(args.device)
+   
+    if args.device != 'cpu':
+        onet_session = onnxruntime.InferenceSession(args.model,providers=[ 'CUDAExecutionProvider'])
+    else:
+        onet_session = onnxruntime.InferenceSession(args.model,providers=[ 'CPUExecutionProvider'])
+    
+    print("providers:",onet_session.get_providers())
+    
+    # build tracker
+    tracker = SiamCARTracker(onet_session,args.device, 'onnx',cfg.TRACK)
 
-    model_name = args.snapshot.split('/')[-2] + '_'+str(hp['lr']) + '_' + str(hp['penalty_k']) + '_' + str(hp['window_lr'])
-    print("model:",model_name)
-
+    frame_count = 0
     for idx, (_,annotation,path,check) in enumerate(dataset):
-        path1 = path.split('/')
-        name = path1[-1]
+        temp = path.split('/')
+        name = temp[5]
         count = 0
         print("name:",name)
         for i in range (len(annotation)):
@@ -70,9 +46,7 @@ def main():
             annotation[i][2]= float(annotation[i][2])
             annotation[i][3]= float(annotation[i][3])
             annotation[i][4]= float(annotation[i][4])
-            tic = cv2.getTickCount()
-            toc = 0
-
+            
             pred_bboxes = []
 
             #init
@@ -82,7 +56,7 @@ def main():
             if annotation[i][0]!=26:
                 img = cv2.imread(path)
                 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
+                
                 if check==0:
                     gt_bbox = [annotation[i][1]*img.shape[1],annotation[i][2]*img.shape[0],annotation[i][3]*img.shape[1],annotation[i][4]*img.shape[0]]
                     gt_bbox = [gt_bbox[0]-gt_bbox[2]/2,gt_bbox[1]-gt_bbox[3]/2,gt_bbox[2],gt_bbox[3]]
@@ -90,35 +64,42 @@ def main():
                     gt_bbox = [annotation[i][1],annotation[i][2],annotation[i][3]-annotation[i][1],annotation[i][4]-annotation[i][2]]
                 cx, cy, w, h = get_axis_aligned_bbox(np.array(gt_bbox))
                 gt_bbox_ = [cx-w/2, cy-h/2, w, h]
-                init_info = {'init_bbox':gt_bbox_}
-                
 
                 tracker.init(img, gt_bbox_)
                 pred_bbox = gt_bbox_
                 pred_bboxes.append(pred_bbox)
 
-
                 #track
                 outputs = tracker.track(img,hp)
                 pred_bbox = outputs['bbox']
                 pred_bboxes.append(pred_bbox)
-                toc += cv2.getTickCount() - tic
 
 
-                model_path = os.path.join('results', args.datasetName, model_name)
+                model_path = os.path.join('results','onnx')
                 if not os.path.isdir(model_path):
                     os.makedirs(model_path)
-
+                    
                 # save results
                 temp = name+"__"+str(classid)+"__"+str(count)
                 result_path = os.path.join(model_path, '{}.txt'.format(name+"__"+str(classid)+"__"+str(count)))
                 with open(result_path, 'w') as f:
                     for x in pred_bboxes:
                         f.write(','.join([str(i) for i in x])+"="+'\n')
-                toc /= cv2.getTickFrequency()
-
-                print('Time: {:5.1f}s Speed: {:3.1f}fps'.format(toc, 1 / toc))
 
 
+
+"""
+Entry Point of Application
+"""
 if __name__ == '__main__':
-    main()
+    # Parse Arguments
+    parser = argparse.ArgumentParser(description='Basic Onnx Example with SiamCAR')
+    parser.add_argument('--model',default='/tf/SiamCAR/onnx/SiamCAR.onnx',help='onnx File')
+    parser.add_argument('--device', default='cpu',
+                        help='Target Plugin: cpu, cuda:0')
+    parser.add_argument('--dataset', default='/tf/SiamCAR/testing_dataset/DATA/', help='Path to origin image')
+    parser.add_argument('--config', type=str, default='/tf/SiamCAR/experiments/siamcar_r50/config_test.yaml',
+        help='config file')
+
+    args = parser.parse_args()
+    run_app()

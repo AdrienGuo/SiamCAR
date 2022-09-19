@@ -97,15 +97,23 @@ class Augmentation:
 
         # adjust target bounding box
         x1, y1 = crop_bbox.x1, crop_bbox.y1
-        bbox = Corner(bbox.x1 - x1, bbox.y1 - y1,
-                      bbox.x2 - x1, bbox.y2 - y1)
+        
+        box=[]
+        
 
         if self.scale:
-            bbox = Corner(bbox.x1 / scale_x, bbox.y1 / scale_y,
-                          bbox.x2 / scale_x, bbox.y2 / scale_y)
+            for i in range(len(bbox)):
+                 
+                box.append(Corner(bbox[i].x1 / scale_x, bbox[i].y1 / scale_y,
+                          bbox[i].x2 / scale_x, bbox[i].y2 / scale_y))
+        else:
+            for i in range(len(bbox)):
+                box.append(Corner(bbox[i].x1 - x1, bbox[i].y1 - y1,
+                          bbox[i].x2 - x1, bbox[i].y2 - y1))
+            
 
         image = self._crop_roi(image, crop_bbox, size)
-        return image, bbox
+        return image, box
 
     def _flip_aug(self, image, bbox):
         image = cv2.flip(image, 1)
@@ -123,7 +131,7 @@ class Augmentation:
             image = self._gray_aug(image)
 
         # shift scale augmentation
-        image, bbox = self._shift_scale_aug(image, bbox, crop_bbox, size)
+        #image, bbox = self._shift_scale_aug(image, bbox, crop_bbox, size)
 
         # color augmentation
         if self.color > np.random.random():

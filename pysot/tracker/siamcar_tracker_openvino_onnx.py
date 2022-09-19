@@ -8,35 +8,47 @@ from __future__ import unicode_literals
 import numpy as np
 import torch.nn.functional as F
 import cv2
-
+import time
+import onnxruntime
 from pysot.core.config import cfg
 from pysot.tracker.base_tracker import SiameseTracker
 from pysot.utils.misc import bbox_clip
-from PIL import Image
-import matplotlib.pyplot as plt
-from torchvision import transforms
 import torch
+from openvino.inference_engine import IECore, IENetwork
 
 class SiamCARTracker(SiameseTracker):
-    def __init__(self, model, cfg):
+    def __init__(self, model, device,types,cfg):
         super(SiamCARTracker, self).__init__()
         hanning = np.hanning(cfg.SCORE_SIZE)
         self.window = np.outer(hanning, hanning)
         self.model = model
-        self.model.eval()
-        
+        self.device = device
+        self.type = types
+        if self.type=='openvino':
+             # Get Input Layer Information
+            Input = iter(self.model.inputs)
+            self.InputLayer_search = next(Input)
+            self.InputLayer_template = next(Input)
+
+            # Get Output Layer Information
+            Output = iter(self.model.outputs)
+            self.OutputLayer_cen = next(Output)
+            self.OutputLayer_cls = next(Output)
+            self.OutputLayer_loc = next(Output)
+
 
     def _convert_cls(self, cls):
         cls = F.softmax(cls[:,:,:,:], dim=1).data[:,1,:,:].cpu().numpy()
         return cls
-
+    
+    
     def init(self, img, bbox):
         """
         args:
             img(np.ndarray): BGR image
             bbox: (x, y, w, h) bbox
         """
-        
+     
         self.box = bbox
         self.center_pos = np.array([bbox[0]+(bbox[2]-1)/2,
                                     bbox[1]+(bbox[3]-1)/2])
@@ -52,14 +64,13 @@ class SiamCARTracker(SiameseTracker):
         self.channel_average = np.mean(img, axis=(0, 1))
 
         # get crop
-        
-        z_crop = self.get_subwindow(img, self.center_pos,
+        self.z_crop = self.get_subwindow(img, self.center_pos,
                                     cfg.TRACK.EXEMPLAR_SIZE,
                                     s_z, self.channel_average)
-        if cfg.CUDA:
-            z_crop = z_crop.cuda()
-        self.model.template(z_crop)
-
+        
+        if self.device !='cpu' and self.device!='CPU':
+            self.z_crop = self.z_crop.cuda()
+        
     def change(self,r):
         return np.maximum(r, 1. / r)
 
@@ -186,7 +197,7 @@ class SiamCARTracker(SiameseTracker):
         return:
             bbox(list):[x, y, width, height]
         """
-
+        timemean=[]
         self.center_pos = np.array([img.shape[1]/2,img.shape[0]/2])
         w_z = self.size[0] + cfg.TRACK.CONTEXT_AMOUNT * np.sum(self.size)
         h_z = self.size[1] + cfg.TRACK.CONTEXT_AMOUNT * np.sum(self.size)
@@ -197,9 +208,39 @@ class SiamCARTracker(SiameseTracker):
         x_crop = self.get_subwindow(img, self.center_pos,
                                     cfg.TRACK.INSTANCE_SIZE,
                                     round(s_x), self.channel_average)
-        if cfg.CUDA:
+        
+        if self.device !='cpu' and self.device!='CPU':
             x_crop = x_crop.cuda()
-        outputs = self.model.track(x_crop)
+        
+        def to_numpy(tensor):
+            return tensor.detach().cpu().numpy() if tensor.requires_grad else tensor.cpu().numpy()
+        # Start Inference
+        start = time.time()
+
+        if self.type=='openvino':
+            results = self.model.infer(inputs={self.InputLayer_template:self.z_crop,self.InputLayer_search: x_crop})
+            cls = torch.from_numpy(results[self.OutputLayer_cls])
+            loc = torch.from_numpy(results[self.OutputLayer_loc])
+            cen = torch.from_numpy(results[self.OutputLayer_cen])
+            
+        elif self.type=='onnx':
+            inputs = {self.model.get_inputs()[0].name: to_numpy(self.z_crop),
+                      self.model.get_inputs()[1].name: to_numpy(x_crop)}
+            results = self.model.run(None, inputs)
+            cls = torch.from_numpy(results[0])
+            loc = torch.from_numpy(results[1])
+            cen = torch.from_numpy(results[2])
+        
+        outputs={'cls':cls,'loc':loc,'cen':cen}
+
+        end = time.time()
+        inf_time = end - start
+        timemean.append(inf_time)
+        print('Inference Time: {} Seconds Single Image'.format(inf_time))
+
+        fps = 1./(end-start)
+        print('Estimated FPS: {} FPS Single Image'.format(fps))
+        
         
         cls = self._convert_cls(outputs['cls']).squeeze()
         cen = outputs['cen'].data.cpu().numpy()

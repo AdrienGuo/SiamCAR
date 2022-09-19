@@ -1,3 +1,11 @@
+# My edition
+dataset/
+onnx/
+results_recall/
+snapshot/
+tools/logs/
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

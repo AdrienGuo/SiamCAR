@@ -21,45 +21,47 @@ __C.CUDA = True
 __C.TRAIN = CN()
 
 # Anchor Target
-__C.TRAIN.EXEMPLAR_SIZE = 127
+__C.TRAIN.EXEMPLAR_SIZE = 127 #127
 
-__C.TRAIN.SEARCH_SIZE = 255
+__C.TRAIN.SEARCH_SIZE = 600 #255
 
-__C.TRAIN.OUTPUT_SIZE = 25
+__C.TRAIN.OUTPUT_SIZE = 68  #25
 
 __C.TRAIN.RESUME = ''
 
-__C.TRAIN.PRETRAINED = ''
 
-__C.TRAIN.LOG_DIR = './logs'
+__C.TRAIN.PRETRAINED = './tools/snapshot/model_general.pth'
 
-__C.TRAIN.SNAPSHOT_DIR = './snapshot'
 
-__C.TRAIN.EPOCH = 20
+__C.TRAIN.LOG_DIR = './logs/test'
+
+
+__C.TRAIN.SNAPSHOT_DIR = './snapshot/test'
+
+
+__C.TRAIN.EPOCH = 10
 
 __C.TRAIN.START_EPOCH = 0
 
-__C.TRAIN.BATCH_SIZE = 32
+__C.TRAIN.BATCH_SIZE = 16 #20 #16
 
-__C.TRAIN.NUM_WORKERS = 1
+__C.TRAIN.NUM_WORKERS = 0
 
 __C.TRAIN.MOMENTUM = 0.9
 
-__C.TRAIN.WEIGHT_DECAY = 0.0001
+__C.TRAIN.WEIGHT_DECAY = 0.0001 
 
 __C.TRAIN.CLS_WEIGHT = 1.0
 
-__C.TRAIN.LOC_WEIGHT = 2.0
+__C.TRAIN.LOC_WEIGHT = 6.0 
 
 __C.TRAIN.CEN_WEIGHT = 1.0
 
 __C.TRAIN.PRINT_FREQ = 20
 
-__C.TRAIN.LOG_GRADS = False
-
 __C.TRAIN.GRAD_CLIP = 10.0
 
-__C.TRAIN.BASE_LR = 0.005
+__C.TRAIN.BASE_LR = 0.005 
 
 __C.TRAIN.LR = CN()
 
@@ -69,7 +71,7 @@ __C.TRAIN.LR.KWARGS = CN(new_allowed=True)
 
 __C.TRAIN.LR_WARMUP = CN()
 
-__C.TRAIN.LR_WARMUP.WARMUP = True
+__C.TRAIN.LR_WARMUP.WARMUP =  True 
 
 __C.TRAIN.LR_WARMUP.TYPE = 'step'
 
@@ -97,73 +99,44 @@ __C.DATASET = CN(new_allowed=True)
 __C.DATASET.TEMPLATE = CN()
 
 # for detail discussion
-__C.DATASET.TEMPLATE.SHIFT = 4
+__C.DATASET.TEMPLATE.SHIFT = 0.0 #4
 
-__C.DATASET.TEMPLATE.SCALE = 0.05
+__C.DATASET.TEMPLATE.SCALE = 0.0 #0.05
 
 __C.DATASET.TEMPLATE.BLUR = 0.0
 
 __C.DATASET.TEMPLATE.FLIP = 0.0
 
-__C.DATASET.TEMPLATE.COLOR = 1.0
+__C.DATASET.TEMPLATE.COLOR = 0.0 # 1.0
 
 __C.DATASET.SEARCH = CN()
 
-__C.DATASET.SEARCH.SHIFT = 64
+__C.DATASET.SEARCH.SHIFT = 0.0 #64
 
-__C.DATASET.SEARCH.SCALE = 0.18
+__C.DATASET.SEARCH.SCALE =0.0 #0.18
 # __C.DATASET.SEARCH.SCALE = 0
 
 __C.DATASET.SEARCH.BLUR = 0.0
 
 __C.DATASET.SEARCH.FLIP = 0.0
 
-__C.DATASET.SEARCH.COLOR = 1.0
+__C.DATASET.SEARCH.COLOR = 0.0 #1.0
 
 # for detail discussion
 __C.DATASET.NEG = 0.0
 
 __C.DATASET.GRAY = 0.0
 
-__C.DATASET.NAMES = ('VID', 'COCO', 'DET', 'YOUTUBEBB')
+__C.DATASET.Background =False
 
-__C.DATASET.VID = CN()
-__C.DATASET.VID.ROOT = 'train_dataset/vid/crop511'          # VID dataset path
-__C.DATASET.VID.ANNO = 'train_dataset/vid/train.json'
-__C.DATASET.VID.FRAME_RANGE = 100
-__C.DATASET.VID.NUM_USE = 100000  # repeat until reach NUM_USE
+__C.DATASET.NAMES = ('PCB',)
 
-__C.DATASET.YOUTUBEBB = CN()
-__C.DATASET.YOUTUBEBB.ROOT = 'train_dataset/yt_bb/crop511'  # YOUTUBEBB dataset path
-__C.DATASET.YOUTUBEBB.ANNO = 'train_dataset/yt_bb/train.json'
-__C.DATASET.YOUTUBEBB.FRAME_RANGE = 3
-__C.DATASET.YOUTUBEBB.NUM_USE = -1  # use all not repeat
+__C.DATASET.PCB = CN()
+__C.DATASET.PCB.ROOT = './dataset/training_dataset/train/'  #'train_dataset/pcb/train'         # COCO dataset path
+__C.DATASET.PCB.ANNO = './dataset/training_dataset/DATA/'  #'train_dataset/pcb/annotation'
+__C.DATASET.PCB.FRAME_RANGE = 1
+__C.DATASET.PCB.NUM_USE = -1
 
-__C.DATASET.COCO = CN()
-__C.DATASET.COCO.ROOT = 'train_dataset/coco/crop511'         # COCO dataset path
-__C.DATASET.COCO.ANNO = 'train_dataset/coco/train2017.json'
-__C.DATASET.COCO.FRAME_RANGE = 1
-__C.DATASET.COCO.NUM_USE = -1
-
-__C.DATASET.DET = CN()
-__C.DATASET.DET.ROOT = 'train_dataset/det/crop511'           # DET dataset path
-__C.DATASET.DET.ANNO = 'train_dataset/det/train.json'
-__C.DATASET.DET.FRAME_RANGE = 1
-__C.DATASET.DET.NUM_USE = -1
-
-__C.DATASET.GOT = CN()
-__C.DATASET.GOT.ROOT = 'train_dataset/got10k/crop511'         # GOT dataset path
-__C.DATASET.GOT.ANNO = 'train_dataset/got10k/train.json'
-__C.DATASET.GOT.FRAME_RANGE = 50
-__C.DATASET.GOT.NUM_USE = 100000
-
-__C.DATASET.LaSOT = CN()
-__C.DATASET.LaSOT.ROOT = 'train_dataset/lasot/crop511'         # LaSOT dataset path
-__C.DATASET.LaSOT.ANNO = 'train_dataset/lasot/train.json'
-__C.DATASET.LaSOT.FRAME_RANGE = 100
-__C.DATASET.LaSOT.NUM_USE = 100000
-
-__C.DATASET.VIDEOS_PER_EPOCH = 600000 #600000
 # ------------------------------------------------------------------------ #
 # Backbone options
 # ------------------------------------------------------------------------ #
@@ -184,7 +157,7 @@ __C.BACKBONE.TRAIN_LAYERS = ['layer2', 'layer3', 'layer4']
 __C.BACKBONE.LAYERS_LR = 0.1
 
 # Switch to train layer
-__C.BACKBONE.TRAIN_EPOCH = 10
+__C.BACKBONE.TRAIN_EPOCH = 200 #200 #10
 
 # ------------------------------------------------------------------------ #
 # Adjust layer options
@@ -226,18 +199,17 @@ __C.TRACK.WINDOW_INFLUENCE = 0.44
 __C.TRACK.LR = 0.4
 
 # Exemplar size
-__C.TRACK.EXEMPLAR_SIZE = 127
+__C.TRACK.EXEMPLAR_SIZE = 127 #127
 
 # Instance size
-__C.TRACK.INSTANCE_SIZE = 255
+__C.TRACK.INSTANCE_SIZE = 1200 #1200 #1000  #1200 #1000 #800 #700 #650 #600 #500 #400 #255
 
 # Context amount
 __C.TRACK.CONTEXT_AMOUNT = 0.5
 
 __C.TRACK.STRIDE = 8
 
-
-__C.TRACK.SCORE_SIZE = 25
+__C.TRACK.SCORE_SIZE = 143 #143 #143 #118 #143 #118 #93 #80 #73  #67 #55 #43 #25
 
 __C.TRACK.hanming = True
 
@@ -248,6 +220,7 @@ __C.TRACK.NUM_N = 1
 __C.TRACK.REGION_S = 0.1
 
 __C.TRACK.REGION_L = 0.44
+
 
 
 # ------------------------------------------------------------------------ #
@@ -262,3 +235,5 @@ __C.HP_SEARCH.GOT10K = [0.7, 0.06, 0.1]
 __C.HP_SEARCH.UAV123 = [0.4, 0.2, 0.3]
 
 __C.HP_SEARCH.LaSOT = [0.33, 0.04, 0.3]
+
+__C.HP_SEARCH.PCB = [0.4, 0.2, 0.3]

@@ -35,6 +35,7 @@ class AverageMeter:
 
     def update(self, batch=1, **kwargs):
         val = {}
+        
         for k in kwargs:
             val[k] = kwargs[k] / float(batch)
         self.val.update(val)

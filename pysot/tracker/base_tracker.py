@@ -46,6 +46,9 @@ class SiameseTracker(BaseTracker):
         """
         if isinstance(pos, float):
             pos = [pos, pos]
+            #print("pos:",pos)
+        
+        #print("pos:",pos)
         sz = original_sz
         im_sz = im.shape
         c = (original_sz + 1) / 2
@@ -83,13 +86,16 @@ class SiameseTracker(BaseTracker):
         else:
             im_patch = im[int(context_ymin):int(context_ymax + 1),
                           int(context_xmin):int(context_xmax + 1), :]
-
+        
+        
         if not np.array_equal(model_sz, original_sz):
             im_patch = cv2.resize(im_patch, (model_sz, model_sz))
+      
         im_patch = im_patch.transpose(2, 0, 1)
         im_patch = im_patch[np.newaxis, :, :, :]
         im_patch = im_patch.astype(np.float32)
         im_patch = torch.from_numpy(im_patch)
-        if cfg.CUDA:
-            im_patch = im_patch.cuda()
+
+        #if cfg.CUDA and not cfg.TRACK.openvino:
+        #    im_patch = im_patch.cuda()
         return im_patch
