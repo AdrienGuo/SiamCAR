@@ -1,5 +1,6 @@
 # My edition
 datasets/
+!pysot/datasets
 onnx/
 snapshot/
 tools/logs/

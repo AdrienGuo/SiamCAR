@@ -17,7 +17,8 @@ import torchvision.transforms.functional as F
 from PIL import Image
 from pysot.core.config import cfg
 from pysot.datasets.collate import collate_fn_new
-from pysot.datasets.pcbdataset_old import PCBDataset
+# new / tri
+from pysot.datasets.pcbdataset_tri import PCBDataset
 from pysot.models.model_builder import ModelBuilder
 # tracker 可以改
 from pysot.tracker.siamcar_tracker import SiamCARTracker
@@ -34,8 +35,7 @@ sys.path.append('../')
 parser = argparse.ArgumentParser(description='siamcar tracking')
 parser.add_argument('--model', type=str, default='', help='model to eval')
 parser.add_argument('--dataset_name', type=str, default='', help='dataset name')
-parser.add_argument('--dataset', type=str, default='', help='training dataset')
-parser.add_argument('--test_dataset', type=str, default='', help='testing dataset')
+parser.add_argument('--dataset_path', type=str, default='', help='testing dataset')
 parser.add_argument('--criteria', type=str, default='', help='criteria of dataset')
 parser.add_argument('--neg', type=float, default=0.0, help='negative pair')
 parser.add_argument('--bg', type=str, help='background of template')
@@ -63,7 +63,7 @@ def main(save_dir):
 
     # Create dataset
     # dataset = ImageFolderWithSelect(args.test_dataset)
-    dataset = PCBDataset(args=args)
+    dataset = PCBDataset(args=args, mode="test")
     assert len(dataset) != 0, "Error, dataset is empty!!"
 
     test_loader = DataLoader(
@@ -181,9 +181,9 @@ def main(save_dir):
         z_box = z_box.squeeze()
         gt_boxes = gt_boxes[:, 1:]  # 不要 0 那項
 
-        img = cv2.imread(img_path)
+        # img = cv2.imread(img_path)
         # 應該不用轉成 rgb 吧？？
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
         ##########################################
         # Create directories
@@ -242,6 +242,8 @@ def main(save_dir):
         x_path = os.path.join(x_dir, f"{idx}.jpg")
         save_image(x_img, x_path)
 
+        # pred_scores on x_img
+        scores = np.around(outputs['top_scores'], decimals=2)
         # === pred_boxes on x_img ===
         for box in outputs['pred_boxes']:
             box = np.around(box, decimals=2)
@@ -255,32 +257,31 @@ def main(save_dir):
             # preds
             for i, x in enumerate(pred_boxes[1:]):
                 # format: [x1, y1, w, h]
-                f.write(', '.join(map(str, x)) + '\n')
+                f.write(', '.join(map(str, x)) + ', ' + str(scores[i]) + '\n')
         print(f"Save annotation result to: {anno_path}")
 
         ##########################################
         # Draw
         ##########################################
-        # === gt_boxes on "x_img" ===
-        gt_image = draw_box(x_img, gt_boxes, type="gt")
-
-        # === pred_boxes ===
+        # gt_boxes on x_img
+        x_img = draw_box(x_img, gt_boxes, type="gt")
+        # pred_boxes on x_img
         pred_path = os.path.join(pred_dir, f"{idx}.jpg")
-        pred_image = draw_preds(sub_dir, gt_image, anno_path, idx)
+        pred_image = draw_preds(sub_dir, x_img, scores, anno_path, idx)
         if pred_image is None:    # 如果沒偵測到物件，存 x_img
             save_image(x_img, pred_path)
         else:
             save_image(pred_image, pred_path)
 
-        ipdb.set_trace()
+        # ipdb.set_trace()
 
 
 if __name__ == '__main__':
     model_name = args.model.split('/')[-2]
     print(f"Model: {model_name}")
 
-    save_dir = os.path.join("./results", model_name)
+    save_dir = os.path.join("./results", args.dataset_name, args.criteria, model_name)
     create_dir(save_dir)
-    print(f"Test results saved to: {save_dir}.")
+    print(f"Test results saved to: {save_dir}")
 
     main(save_dir)
