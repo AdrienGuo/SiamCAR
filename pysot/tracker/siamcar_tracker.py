@@ -36,13 +36,13 @@ class SiamCARTracker(SiameseTracker):
         # Debug
         if pad.min() < 0:
             print(f"invalid pad value: {pad.min()}")
-            pad[pad < 0] = 0.0
+            # pad[pad < 0] = 0.0
         if w.min() < 0:
             print(f"ERROR, invalid w value: {w.min()}")
-            w[w < 0] = 0.0
+            # w[w < 0] = 0.0
         if h.min() < 0:
             print(f"ERROR, invalid w value: {h.min()}")
-            h[h < 0] = 0.0
+            # h[h < 0] = 0.0
         return np.sqrt((w + pad) * (h + pad))
 
     def cal_penalty(self, ltrbs, penalty_lk):
@@ -75,6 +75,12 @@ class SiamCARTracker(SiameseTracker):
         """
         看起來亭儀這裡就不管了，直接回傳和原本輸入一模一樣的 p_score_up，
         簡單來說，就是一個沒用的 method。
+
+        這個 method 我沒有看得很懂，不過我猜原本的用意，
+        是要限制預測的範圍，會以 max_r_up_hp, max_c_up_hp 為中心，
+        框出一個框框，超出這個框框的 score 全部都設為 0，
+        但這是追蹤才能這樣做，因為他們只有一個 target，
+        我們有很多個 targets 所以整張影像都要看。
 
         Returns:
             p_score_up: Same as the input p_score_up
@@ -109,14 +115,15 @@ class SiamCARTracker(SiameseTracker):
         hp_score_up,  # useless
         p_score_up,
         scale_score,  # useless
-        ltrbs: np.array,  # useless, (size, size, 4)
+        ltrbs,  # useless, (size, size, 4)
         ltrbs_up: np.array,  # (upsize, upsize, 4)
         hp: dict,
         cls_up  # (upsize, upsize)
     ):
         # score_up: (upsize, upsize)
         # coarse_location 完全沒用，score_up 就等於 p_score_up
-        score_up = self.coarse_location(hp_score_up, p_score_up, scale_score, ltrbs)
+        # score_up = self.coarse_location(hp_score_up, p_score_up, scale_score, ltrbs)
+        score_up = p_score_up
 
         boxes = []
         scores = []
@@ -234,6 +241,8 @@ class SiamCARTracker(SiameseTracker):
         # - 把框框移動到 “原圖” 上時，就加上 “原圖” 的中心點位置 -
         # self.center_pos = np.array([img.shape[1]/2, img.shape[0]/2])
         # - 把框框移動到 "search image" 上時，就加上 "search image" 的中心點位置 -
+        # TODO: 要動態調整
+        # 調整成 x_img 的大小，記得寬高要分開
         self.center_pos = np.array([cfg.TRACK.INSTANCE_SIZE / 2, cfg.TRACK.INSTANCE_SIZE / 2])
 
         # - 若上面的框框是放在 原圖 上面，要計算縮放比例 s_z -
@@ -265,6 +274,7 @@ class SiamCARTracker(SiameseTracker):
         # ltrbs: (4, size, size)
         ltrbs = outputs['loc'].data.cpu().numpy().squeeze()
 
+        # TODO: 高、寬要分開動態調整
         upsize = (cfg.TRACK.SCORE_SIZE - 1) * cfg.TRACK.STRIDE + 1
         # 計算 (大小 & 長寬比) 的懲罰量
         penalty = self.cal_penalty(ltrbs, hp['penalty_k'])
@@ -278,6 +288,7 @@ class SiamCARTracker(SiameseTracker):
         else:
             hp_score = p_score
 
+        # TODO: upsize_h, upsize_w 順序不能顛倒！！
         # upsize = (size - 1) * 8 + 1
         hp_score_up = cv2.resize(hp_score, (upsize, upsize), interpolation=cv2.INTER_CUBIC)
         p_score_up = cv2.resize(p_score, (upsize, upsize), interpolation=cv2.INTER_CUBIC)

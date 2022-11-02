@@ -30,8 +30,8 @@ __C.TRAIN.RESUME = ''
 
 
 # Whole model pretrained
-__C.TRAIN.PRETRAINED = ''
-# __C.TRAIN.PRETRAINED = './tools/snapshot/model_general.pth'
+# __C.TRAIN.PRETRAINED = ''
+__C.TRAIN.PRETRAINED = './tools/snapshot/model_general.pth'
 
 
 __C.TRAIN.LOG_DIR = './logs/test'
@@ -149,8 +149,8 @@ __C.BACKBONE.TYPE = 'res50'
 __C.BACKBONE.KWARGS = CN(new_allowed=True)
 
 # Pretrained backbone weights
-# __C.BACKBONE.PRETRAINED = ''
-__C.BACKBONE.PRETRAINED = './pretrained_models/resnet50.model'
+__C.BACKBONE.PRETRAINED = ''
+# __C.BACKBONE.PRETRAINED = './pretrained_models/resnet50.model'
 
 # Train layers
 __C.BACKBONE.TRAIN_LAYERS = ['layer2', 'layer3', 'layer4']
@@ -159,7 +159,7 @@ __C.BACKBONE.TRAIN_LAYERS = ['layer2', 'layer3', 'layer4']
 __C.BACKBONE.LAYERS_LR = 0.1
 
 # Switch to train layer
-__C.BACKBONE.TRAIN_EPOCH = 200
+__C.BACKBONE.TRAIN_EPOCH = 60
 
 # ------------------------------------------------------------------------ #
 # Adjust layer options

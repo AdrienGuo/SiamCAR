@@ -154,26 +154,27 @@ class SiamCARLossComputation(object):
         gt_cls_all = []
         reg_targets = []
         bboxes = gt_bbox
+        # TODO: 其實這行沒用啊
         gt_cls = gt_cls.view(-1, self.cfg.TRAIN.OUTPUT_SIZE**2)  # gt_cls: (b, 625)
 
         for i in range(gt_cls.shape[0]):  # 每次處裡一張，有 batch 張
-            bbox = []  # 一張影像的 bounding box
+            # curr_bbox = []  # 一張影像的 bounding box
 
             # 選出和這張對應到的那些 gt_bbox
-            bbox = bboxes[(bboxes[:, 0] == i).nonzero().squeeze(dim=1)]
+            curr_bbox = bboxes[(bboxes[:, 0] == i).nonzero().squeeze(dim=1)]
             # for j in range(len(bboxes)):
             #     if bboxes[j][0] == i:
             #         # 代表是對應到的 boxes
-            #         bbox.append(bboxes[j])
+            #         curr_bbox.append(bboxes[j])
             #     else:
             #         break
             # bboxes = bboxes[j:, :]
-            # bbox = torch.stack(bbox)
+            # curr_bbox = torch.stack(curr_bbox)
 
-            l = xs[:, None] - bbox[:, 1][None].float()
-            t = ys[:, None] - bbox[:, 2][None].float()
-            r = bbox[:, 3][None].float() - xs[:, None]
-            b = bbox[:, 4][None].float() - ys[:, None]
+            l = xs[:, None] - curr_bbox[:, 1][None].float()
+            t = ys[:, None] - curr_bbox[:, 2][None].float()
+            r = curr_bbox[:, 3][None].float() - xs[:, None]
+            b = curr_bbox[:, 4][None].float() - ys[:, None]
             # N 為所有採樣點的數，M 為 gt_boxes 數量
             # reg_targets_per_im: (N, M, 4)
             reg_targets_per_im = torch.stack([l, t, r, b], dim=2)
@@ -224,9 +225,9 @@ class SiamCARLossComputation(object):
         """
 
         # TODO: 這裡的 N 算錯的吧
-        N = pred_cls.size(0)  # 影像張數
-        # label_cls (list[array]), gt_boxes (list[array])
-        label_cls, gt_boxes = self.prepare_targets(locations, gt_cls, gt_boxes)
+        N = pred_cls.size(0)  # 影像張數，其實就是 batch 大小
+        # gt_cls (list[array]), gt_boxes (list[array])
+        gt_cls, gt_boxes = self.prepare_targets(locations, gt_cls, gt_boxes)
         pred_boxes_flatten = []
         pred_cen_flatten = []
         gt_cls_flatten = []
@@ -236,21 +237,25 @@ class SiamCARLossComputation(object):
         cls_loss_all = []
         reg_loss_all = []
 
-        for n in range(N):  # 有 N 張影像
+        for n in range(N):  # 有 N 張影像，batch 大小
             # 一張影像 (1 batch)
             reg_loss = 0
             cen_loss = 0
             cls_loss = 0
-            K = len(label_cls[n])  # 這張影像裡面有 K 個 gt_boxes
+            K = len(gt_cls[n])  # 這張影像裡面有 K 個 gt_boxes
+            # TODO: 亭儀是一個 gt 一個 gt 去算然後加起來，
+            # 但我的 SiamRPN++ 是全部的 gt 都一起算，
+            # 這兩種做法會等價嗎？
+            # (全部一起算的話要處理每一個 grid point 要去對哪一個 gt 的問題)
             for k in range(K):
-                # 這張影像對應到的 gt_box
+                # 這張影像對應到的其中一個 gt_box
 
                 # pred 的邊界框回歸
                 # pred_boxes_flatten: (4, size, size) -> (size, size, 4) -> (size * size, 4)
                 pred_boxes_flatten = (pred_boxes[n].permute(1, 2, 0).contiguous().view(-1, 4))
                 # gt 分類
                 # gt_cls_flatten: (size * size)
-                gt_cls_flatten = (label_cls[n][k].view(-1))
+                gt_cls_flatten = (gt_cls[n][k].view(-1))
                 # gt 邊界框回歸
                 # gt_boxes_flatten: (size * size, 4)
                 gt_boxes_flatten = (gt_boxes[n][k].view(-1, 4))
