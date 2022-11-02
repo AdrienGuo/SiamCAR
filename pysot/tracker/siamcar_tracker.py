@@ -36,13 +36,13 @@ class SiamCARTracker(SiameseTracker):
         # Debug
         if pad.min() < 0:
             print(f"invalid pad value: {pad.min()}")
-            pad[pad < 0] = 0.0
+            # pad[pad < 0] = 0.0
         if w.min() < 0:
             print(f"ERROR, invalid w value: {w.min()}")
-            w[w < 0] = 0.0
+            # w[w < 0] = 0.0
         if h.min() < 0:
             print(f"ERROR, invalid w value: {h.min()}")
-            h[h < 0] = 0.0
+            # h[h < 0] = 0.0
         return np.sqrt((w + pad) * (h + pad))
 
     def cal_penalty(self, ltrbs, penalty_lk):
