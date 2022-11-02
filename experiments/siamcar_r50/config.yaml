@@ -4,9 +4,8 @@ BACKBONE:
     TYPE: "resnet50"
     KWARGS:
         used_layers: [2, 3, 4]
-    PRETRAINED: ''
     TRAIN_LAYERS: ['layer2','layer3','layer4']
-    TRAIN_EPOCH: 200 #10
+    # TRAIN_EPOCH: 20 #10
     LAYERS_LR: 0.1
 
 ADJUST:
@@ -23,23 +22,18 @@ TRACK:
     WINDOW_INFLUENCE: 0.44
     LR: 0.33
     EXEMPLAR_SIZE: 127
-    INSTANCE_SIZE: 600 #255
     CONTEXT_AMOUNT: 0.5
     STRIDE: 8
 
 TRAIN:
-    EPOCH: 10
-    START_EPOCH: 0
-    BATCH_SIZE: 8
     BASE_LR:  0.005
     CLS_WEIGHT: 1.0
     LOC_WEIGHT: 6.0 #3.0
     CEN_WEIGHT: 1.0
-    RESUME: ''
     NUM_CLASSES: 2
     NUM_CONVS: 4
     PRIOR_PROB: 0.01
-    OUTPUT_SIZE: 68 #68 #25 #25 #43 # 31 #
+    # OUTPUT_SIZE: 68 #68 #25 #25 #43 # 31 #
 
     
     LR:

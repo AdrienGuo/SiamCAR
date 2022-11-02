@@ -1,8 +1,8 @@
 import math
 
-import torch.nn as nn
+import ipdb
 import torch
-
+import torch.nn as nn
 
 __all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50']
 
@@ -252,8 +252,9 @@ class BasicBlock(nn.Module):
 class Bottleneck(nn.Module):
     expansion = 4
 
-    def __init__(self, inplanes, planes, stride=1,
-                 downsample=None, dilation=1):
+    def __init__(
+        self, inplanes, planes, stride=1, downsample=None, dilation=1
+    ):
         super(Bottleneck, self).__init__()
         self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=1, bias=False)
         self.bn1 = nn.BatchNorm2d(planes)
@@ -301,16 +302,22 @@ class Bottleneck(nn.Module):
 
 
 class ResNet(nn.Module):
-    def __init__(self, block, layers, used_layers):
+    def __init__(
+        self,
+        block,
+        layers,  # res50: [3, 4, 6, 3]
+        used_layers
+    ):
         self.inplanes = 64
         super(ResNet, self).__init__()
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=0,  # 3
-                               bias=False)
+        self.conv1 = nn.Conv2d(
+            3, 64, kernel_size=7, stride=2, padding=0, bias=False
+        )
         self.bn1 = nn.BatchNorm2d(64)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-        self.layer1 = self._make_layer(block, 64, layers[0])
-        self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
+        self.layer1 = self._make_layer(block, planes=64, blocks=layers[0])
+        self.layer2 = self._make_layer(block, planes=128, blocks=layers[1], stride=2)
 
         self.feature_size = 128 * block.expansion
         self.used_layers = used_layers
@@ -318,8 +325,9 @@ class ResNet(nn.Module):
         layer4 = True if 4 in used_layers else False
 
         if layer3:
-            self.layer3 = self._make_layer(block, 256, layers[2],
-                                           stride=1, dilation=2)  # 15x15, 7x7
+            self.layer3 = self._make_layer(
+                block, 256, layers[2], stride=1, dilation=2
+            )  # 15x15, 7x7
             self.feature_size = (256 + 128) * block.expansion
         else:
             self.layer3 = lambda x: x  # identity
@@ -342,11 +350,14 @@ class ResNet(nn.Module):
     def _make_layer(self, block, planes, blocks, stride=1, dilation=1):
         downsample = None
         dd = dilation
+        # self.inplanes = 64, block.expansion = 4
         if stride != 1 or self.inplanes != planes * block.expansion:
             if stride == 1 and dilation == 1:
                 downsample = nn.Sequential(
-                    nn.Conv2d(self.inplanes, planes * block.expansion,
-                              kernel_size=1, stride=stride, bias=False),
+                    nn.Conv2d(
+                        self.inplanes, planes * block.expansion,
+                        kernel_size=1, stride=stride, bias=False
+                    ),
                     nn.BatchNorm2d(planes * block.expansion),
                 )
             else:
@@ -357,15 +368,20 @@ class ResNet(nn.Module):
                     dd = 1
                     padding = 0
                 downsample = nn.Sequential(
-                    nn.Conv2d(self.inplanes, planes * block.expansion,
-                              kernel_size=3, stride=stride, bias=False,  # kernel=3
-                              padding=padding, dilation=dd),
+                    nn.Conv2d(
+                        self.inplanes, planes * block.expansion,
+                        kernel_size=3, stride=stride, bias=False,  # kernel=3
+                        padding=padding, dilation=dd
+                    ),
                     nn.BatchNorm2d(planes * block.expansion),
                 )
 
         layers = []
-        layers.append(block(self.inplanes, planes, stride,
-                            downsample, dilation=dilation))
+        layers.append(
+            block(
+                self.inplanes, planes, stride, downsample, dilation=dilation
+            )
+        )
         self.inplanes = planes * block.expansion
         for i in range(1, blocks):
             layers.append(block(self.inplanes, planes, dilation=dilation))
@@ -373,6 +389,7 @@ class ResNet(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
+        # ipdb.set_trace()
         x = self.conv1(x)
         x = self.bn1(x)
         x_ = self.relu(x)
@@ -382,16 +399,7 @@ class ResNet(nn.Module):
         p2 = self.layer2(p1)
         p3 = self.layer3(p2)
         p4 = self.layer4(p3)
-        '''
-        print("x:",x.shape)
-        print("x_:",x_.shape)
-        print("p1:",p1.shape)
-        print("p2:",p2.shape)
-        print("p3:",p3.shape)
-        print("p4:",p4.shape)
-        '''
-        
-        
+
         out = [x_, p1, p2, p3, p4]
         out = [out[i] for i in self.used_layers]
         if len(out) == 1:

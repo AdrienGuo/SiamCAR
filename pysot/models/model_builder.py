@@ -1,21 +1,21 @@
 # Copyright (c) SenseTime. All Rights Reserved.
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division, print_function,
+                        unicode_literals)
 
+import ipdb
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
 from pysot.core.config import cfg
-from pysot.models.loss_car_multi import make_siamcar_loss_evaluator
 from pysot.models.backbone import get_backbone
 from pysot.models.head.car_head import CARHead
+from pysot.models.loss_car_multi import make_siamcar_loss_evaluator
 from pysot.models.neck import get_neck
-from ..utils.location_grid import compute_locations
 from pysot.utils.xcorr import xcorr_depthwise
+
+from ..utils.location_grid import compute_locations
+
 
 class ModelBuilder(nn.Module):
     def __init__(self):
@@ -49,25 +49,27 @@ class ModelBuilder(nn.Module):
 
     def track(self, x):
         xf = self.backbone(x)
+
         if cfg.ADJUST.ADJUST:
             xf = self.neck(xf)
 
-        features = self.xcorr_depthwise(xf[0],self.zf[0])
-        for i in range(len(xf)-1):
-            features_new = self.xcorr_depthwise(xf[i+1],self.zf[i+1])
-            features = torch.cat([features,features_new],1)
+        features = self.xcorr_depthwise(xf[0], self.zf[0])
+        for i in range(len(xf) - 1):
+            features_new = self.xcorr_depthwise(xf[i + 1], self.zf[i + 1])
+            features = torch.cat([features, features_new], 1)
         features = self.down(features)
 
         cls, loc, cen = self.car_head(features)
+
         return {
-                'cls': cls,
-                'loc': loc,
-                'cen': cen
-               }
+            'cls': cls,
+            'loc': loc,
+            'cen': cen
+        }
 
     def log_softmax(self, cls):
         b, a2, h, w = cls.size()
-        cls = cls.view(b, 2, a2//2, h, w)
+        cls = cls.view(b, 2, a2 // 2, h, w)
         cls = cls.permute(0, 2, 3, 4, 1).contiguous()
         cls = F.log_softmax(cls, dim=4)
         return cls
@@ -75,41 +77,53 @@ class ModelBuilder(nn.Module):
     def forward(self, data):
         """ only used in training
         """
-        template = data['template'].cuda()
-        search = data['search'].cuda()
-        label_cls = data['label_cls'].cuda()
-        label_loc = data['bbox'].cuda()
-        #print("bbox_model:",label_loc.shape)
+        z_img = data['z_img'].cuda()
+        x_img = data['x_img'].cuda()
+        gt_cls = data['gt_cls'].cuda()
+        gt_boxes = data['gt_boxes'].cuda()  # (?, [x1, y1, x2, y2])
 
-        # get feature
-        zf = self.backbone(template)
-        xf = self.backbone(search)
+        # Backbone (ResNet50)
+        zf = self.backbone(z_img)
+        xf = self.backbone(x_img)
+
+        # Neck
         if cfg.ADJUST.ADJUST:
             zf = self.neck(zf)
             xf = self.neck(xf)
 
-
-        features = self.xcorr_depthwise(xf[0],zf[0])
-        for i in range(len(xf)-1):
-            features_new = self.xcorr_depthwise(xf[i+1],zf[i+1])
-            features = torch.cat([features,features_new],1)
+        # Depthwise Correlation
+        features = self.xcorr_depthwise(xf[0], zf[0])
+        for i in range(len(xf) - 1):
+            features_new = self.xcorr_depthwise(xf[i + 1], zf[i + 1])
+            features = torch.cat([features, features_new], 1)
+        # features: (b, c=256, h, w)
         features = self.down(features)
 
+        # Classificaitn, Regression
         cls, loc, cen = self.car_head(features)
+
+        # 做出 meshgrid
+        # locations: (size * size, 2)
         locations = compute_locations(cls, cfg.TRACK.STRIDE)
+        # cls: (b, 2, h, w) -> (b, 1, h, w, 2)
         cls = self.log_softmax(cls)
-        cls_loss, loc_loss, cen_loss = self.loss_evaluator(
+
+        # 算 loss
+        cen_loss, cls_loss, loc_loss = self.loss_evaluator(
             locations,
+            cen,
             cls,
             loc,
-            cen, label_cls, label_loc
+            gt_cls,
+            gt_boxes
         )
 
         # get loss
         outputs = {}
-        outputs['total_loss'] = cfg.TRAIN.CLS_WEIGHT * cls_loss + \
+        outputs['cen'] = cen_loss
+        outputs['cls'] = cls_loss
+        outputs['loc'] = loc_loss
+        outputs['total'] = cfg.TRAIN.CLS_WEIGHT * cls_loss + \
             cfg.TRAIN.LOC_WEIGHT * loc_loss + cfg.TRAIN.CEN_WEIGHT * cen_loss
-        outputs['cls_loss'] = cls_loss
-        outputs['loc_loss'] = loc_loss
-        outputs['cen_loss'] = cen_loss
+
         return outputs

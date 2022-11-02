@@ -33,16 +33,6 @@ class SiamCARTracker(SiameseTracker):
 
     def sz(self, w, h):
         pad = (w + h) * 0.5
-        # Debug
-        if pad.min() < 0:
-            print(f"invalid pad value: {pad.min()}")
-            pad[pad < 0] = 0.0
-        if w.min() < 0:
-            print(f"ERROR, invalid w value: {w.min()}")
-            w[w < 0] = 0.0
-        if h.min() < 0:
-            print(f"ERROR, invalid w value: {h.min()}")
-            h[h < 0] = 0.0
         return np.sqrt((w + pad) * (h + pad))
 
     def cal_penalty(self, ltrbs, penalty_lk):
@@ -190,7 +180,7 @@ class SiamCARTracker(SiameseTracker):
 
         return result
 
-    def init(self, z_img: torch.tensor, bbox: np.array):
+    def init(self, img: torch.tensor, bbox: np.array):
         """
         Args:
             img(np.ndarray): BGR image
@@ -198,63 +188,63 @@ class SiamCARTracker(SiameseTracker):
         """
 
         self.box = bbox
-        # self.center_pos = np.array([bbox[0]+(bbox[2]-1)/2,
-        #                             bbox[1]+(bbox[3]-1)/2])
+        self.center_pos = np.array([bbox[0]+(bbox[2]-1)/2,
+                                    bbox[1]+(bbox[3]-1)/2])
 
         # self.size: template 的原始寬, 高
         self.size = np.array([bbox[2], bbox[3]])
 
-        # # calculate z crop size
-        # w_z = self.size[0] + cfg.TRACK.CONTEXT_AMOUNT * np.sum(self.size)
-        # h_z = self.size[1] + cfg.TRACK.CONTEXT_AMOUNT * np.sum(self.size)
-        # s_z = round(np.sqrt(w_z * h_z))
+        # calculate z crop size
+        w_z = self.size[0] + cfg.TRACK.CONTEXT_AMOUNT * np.sum(self.size)
+        h_z = self.size[1] + cfg.TRACK.CONTEXT_AMOUNT * np.sum(self.size)
+        s_z = round(np.sqrt(w_z * h_z))
 
         # # calculate channle average
-        # self.channel_average = np.mean(img, axis=(0, 1))
+        self.channel_average = np.mean(img, axis=(0, 1))
 
-        # # get crop
-        # z_crop = self.get_subwindow(img, self.center_pos,
-        #                             cfg.TRACK.EXEMPLAR_SIZE,
-        #                             s_z, self.channel_average)
-        # if cfg.CUDA:
-        #     z_crop = z_crop.cuda()
+        # get crop
+        z_crop = self.get_subwindow(img, self.center_pos,
+                                    cfg.TRACK.EXEMPLAR_SIZE,
+                                    s_z, self.channel_average)
+        if cfg.CUDA:
+            z_crop = z_crop.cuda()
 
-        self.model.template(z_img)
+        self.model.template(z_crop)
 
-        return z_img
+        return z_crop
 
-    def track(self, x_img: torch.tensor, hp: dict):
+    def track(self, img: torch.tensor, hp: dict):
         """
         Args:
-            x_img (tensor): (b, c, h, w) BGR image
+            img (tensor): BGR image
         Return:
             bbox (list): [x, y, width, height]
         """
         # === 把框框移動到 "原圖" or "search image" ===
         # - 把框框移動到 “原圖” 上時，就加上 “原圖” 的中心點位置 -
-        # self.center_pos = np.array([img.shape[1]/2, img.shape[0]/2])
+        self.center_pos = np.array([img.shape[1] / 2, img.shape[0] / 2])
         # - 把框框移動到 "search image" 上時，就加上 "search image" 的中心點位置 -
-        self.center_pos = np.array([cfg.TRACK.INSTANCE_SIZE / 2, cfg.TRACK.INSTANCE_SIZE / 2])
+        # self.center_pos = np.array([cfg.TRACK.INSTANCE_SIZE / 2, cfg.TRACK.INSTANCE_SIZE / 2])
 
         # - 若上面的框框是放在 原圖 上面，要計算縮放比例 s_z -
-        # w_z = self.size[0] + cfg.TRACK.CONTEXT_AMOUNT * np.sum(self.size)
-        # h_z = self.size[1] + cfg.TRACK.CONTEXT_AMOUNT * np.sum(self.size)
-        # s_z = np.sqrt(w_z * h_z)
-        # self.scale_z = cfg.TRACK.EXEMPLAR_SIZE / s_z
+        w_z = self.size[0] + cfg.TRACK.CONTEXT_AMOUNT * np.sum(self.size)
+        h_z = self.size[1] + cfg.TRACK.CONTEXT_AMOUNT * np.sum(self.size)
+        s_z = np.sqrt(w_z * h_z)
+        self.scale_z = cfg.TRACK.EXEMPLAR_SIZE / s_z
 
         # - 若上面的框框是放在 search image 上面，就不用縮放 -
-        self.scale_z = 1
+        # self.scale_z = 1
 
-        # s_x = s_z * (cfg.TRACK.INSTANCE_SIZE / cfg.TRACK.EXEMPLAR_SIZE)
-        # x_crop = self.get_subwindow(img, self.center_pos,
-        #                             cfg.TRACK.INSTANCE_SIZE,
-        #                             round(s_x), self.channel_average)
-        # if cfg.CUDA:
-        #     x_crop = x_crop.cuda()
-        # outputs = self.model.track(x_crop)
+        s_x = s_z * (cfg.TRACK.INSTANCE_SIZE / cfg.TRACK.EXEMPLAR_SIZE)
+        x_crop = self.get_subwindow(img, self.center_pos,
+                                    cfg.TRACK.INSTANCE_SIZE,
+                                    round(s_x), self.channel_average)
+        if cfg.CUDA:
+            x_crop = x_crop.cuda()
+        outputs = self.model.track(x_crop)
 
         # Get pred outputs.
-        outputs = self.model.track(x_img)
+        # outputs = self.model.track(x_img)
 
         cls = self._convert_cls(outputs['cls']).squeeze()
 
@@ -278,7 +268,7 @@ class SiamCARTracker(SiameseTracker):
         else:
             hp_score = p_score
 
-        # upsize = (size - 1) * 8 + 1
+        # upsize = 193
         hp_score_up = cv2.resize(hp_score, (upsize, upsize), interpolation=cv2.INTER_CUBIC)
         p_score_up = cv2.resize(p_score, (upsize, upsize), interpolation=cv2.INTER_CUBIC)
         cls_up = cv2.resize(cls, (upsize, upsize), interpolation=cv2.INTER_CUBIC)
@@ -305,9 +295,6 @@ class SiamCARTracker(SiameseTracker):
         iou_threshold = 0.1
         results = self.nms(bbox, rescore, iou_threshold)
 
-        # 用圖片的寬高限制預測的範圍
-        max_width = x_img.size(3)
-        max_height = x_img.size(2)
         for i in range(len(results)):
             box = bbox[results[i], :]
             score = rescore[results[i]]
@@ -319,10 +306,10 @@ class SiamCARTracker(SiameseTracker):
                 height = box[3]  # self.size[1] * (1 - lr) + bbox[3] * lr
 
                 # clip boundary
-                cx = bbox_clip(cx, 0, max_width)
-                cy = bbox_clip(cy, 0, max_height)
-                width = bbox_clip(width, 0, max_width)
-                height = bbox_clip(height, 0, max_height)
+                cx = bbox_clip(cx, 0, img.shape[1])
+                cy = bbox_clip(cy, 0, img.shape[0])
+                width = bbox_clip(width, 0, img.shape[1])
+                height = bbox_clip(height, 0, img.shape[0])
 
                 box = [cx - width / 2,
                        cy - height / 2,
@@ -336,5 +323,5 @@ class SiamCARTracker(SiameseTracker):
         return {
             'top_scores': top_scores,
             'pred_boxes': boxes,
-            'x_img': x_img
+            'x_crop': x_crop
         }

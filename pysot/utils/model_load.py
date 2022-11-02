@@ -72,8 +72,9 @@ def load_pretrain(model, pretrained_path):
 
 def restore_from(model, optimizer, ckpt_path):
     device = torch.cuda.current_device()
-    ckpt = torch.load(ckpt_path,
-        map_location=lambda storage, loc: storage.cuda(device))
+    ckpt = torch.load(
+        ckpt_path, map_location=lambda storage, loc: storage.cuda(device)
+    )
     epoch = ckpt['epoch']
 
     ckpt_model_dict = remove_prefix(ckpt['state_dict'], 'module.')
