@@ -1,15 +1,12 @@
 # Copyright (c) SenseTime. All Rights Reserved.
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division, print_function,
+                        unicode_literals)
 
-import numpy as np
 import cv2
-
-from pysot.utils.bbox import corner2center, \
-        Center, center2corner, Corner
+import ipdb
+import numpy as np
+from pysot.utils.bbox import Center, Corner, center2corner, corner2center
 
 
 class Augmentation:
@@ -123,6 +120,9 @@ class Augmentation:
         return image, bbox
 
     def __call__(self, image, bbox, size, gray=False):
+        image_tmp = image.copy()
+        bbox_tmp = bbox
+
         shape = image.shape
         crop_bbox = center2corner(Center(shape[0]//2, shape[1]//2,
                                          size-1, size-1))
@@ -144,4 +144,9 @@ class Augmentation:
         # flip augmentation
         if self.flip and self.flip > np.random.random():
             image, bbox = self._flip_aug(image, bbox)
+
+        assert np.array_equal(image_tmp, image), "should be the same"
+        assert bbox_tmp == bbox, "should be the same"
+        del image_tmp, bbox_tmp
+
         return image, bbox

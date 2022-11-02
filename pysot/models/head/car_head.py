@@ -84,4 +84,3 @@ class Scale(nn.Module):
 
     def forward(self, input):
         return input * self.scale
-

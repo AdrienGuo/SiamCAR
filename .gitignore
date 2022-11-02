@@ -1,9 +1,17 @@
 # My edition
-dataset/
+datasets/
 onnx/
-results_recall/
 snapshot/
 tools/logs/
+image_check/
+logs/
+results/
+results_image/
+results_recall/
+wandb/
+wandb_titan/
+save_models/
+train_dataset/
 
 
 # Byte-compiled / optimized / DLL files

@@ -1,19 +1,28 @@
 # Copyright (c) SenseTime. All Rights Reserved.
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division, print_function,
+                        unicode_literals)
 
 from collections import namedtuple
 
+import ipdb
 import numpy as np
-
 
 Corner = namedtuple('Corner', 'x1 y1 x2 y2')
 # alias
 BBox = Corner
 Center = namedtuple('Center', 'x y w h')
+
+
+def ratio2real(image, box):
+    h, w = image.shape[:2]
+
+    box[:, 0] = box[:, 0] * w
+    box[:, 1] = box[:, 1] * h
+    box[:, 2] = box[:, 2] * w
+    box[:, 3] = box[:, 3] * h
+
+    return box
 
 
 def corner2center(corner):
@@ -45,13 +54,19 @@ def center2corner(center):
     if isinstance(center, Center):
         x, y, w, h = center
         return Corner(x - w * 0.5, y - h * 0.5, x + w * 0.5, y + h * 0.5)
-    else:
+    elif isinstance(center, list):
         x, y, w, h = center[0], center[1], center[2], center[3]
         x1 = x - w * 0.5
         y1 = y - h * 0.5
         x2 = x + w * 0.5
         y2 = y + h * 0.5
         return x1, y1, x2, y2
+    elif isinstance(center, np.ndarray):
+        center[:, 0] = center[:, 0] - center[:, 2] * 0.5    # x1
+        center[:, 1] = center[:, 1] - center[:, 3] * 0.5    # y1
+        center[:, 2] = center[:, 0] + center[:, 2]    # x2 = x1 + w
+        center[:, 3] = center[:, 1] + center[:, 3]    # y2 = y1 + h
+        return center
 
 
 def IoU(rect1, rect2):

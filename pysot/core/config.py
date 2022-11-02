@@ -21,47 +21,43 @@ __C.CUDA = True
 __C.TRAIN = CN()
 
 # Anchor Target
-__C.TRAIN.EXEMPLAR_SIZE = 127 #127
+__C.TRAIN.EXEMPLAR_SIZE = 127
+__C.TRAIN.SEARCH_SIZE = 255
+__C.TRAIN.OUTPUT_SIZE = 25
 
-__C.TRAIN.SEARCH_SIZE = 600 #255
-
-__C.TRAIN.OUTPUT_SIZE = 68  #25
 
 __C.TRAIN.RESUME = ''
 
 
-__C.TRAIN.PRETRAINED = './tools/snapshot/model_general.pth'
+# Whole model pretrained
+__C.TRAIN.PRETRAINED = ''
+# __C.TRAIN.PRETRAINED = './tools/snapshot/model_general.pth'
 
 
 __C.TRAIN.LOG_DIR = './logs/test'
 
 
-__C.TRAIN.SNAPSHOT_DIR = './snapshot/test'
+__C.TRAIN.MODEL_DIR = './save_models/'
 
 
-__C.TRAIN.EPOCH = 10
-
+# __C.TRAIN.EPOCH = 200
 __C.TRAIN.START_EPOCH = 0
-
-__C.TRAIN.BATCH_SIZE = 16 #20 #16
-
+# __C.TRAIN.BATCH_SIZE = 1
 __C.TRAIN.NUM_WORKERS = 0
 
 __C.TRAIN.MOMENTUM = 0.9
-
-__C.TRAIN.WEIGHT_DECAY = 0.0001 
-
-__C.TRAIN.CLS_WEIGHT = 1.0
-
-__C.TRAIN.LOC_WEIGHT = 6.0 
-
+__C.TRAIN.WEIGHT_DECAY = 0.0001
 __C.TRAIN.CEN_WEIGHT = 1.0
+__C.TRAIN.CLS_WEIGHT = 1.0
+__C.TRAIN.LOC_WEIGHT = 6.0
 
+__C.TRAIN.EVAL_FREQ = 20
+__C.TRAIN.SAVE_MODEL_FREQ = 50
 __C.TRAIN.PRINT_FREQ = 20
 
 __C.TRAIN.GRAD_CLIP = 10.0
 
-__C.TRAIN.BASE_LR = 0.005 
+__C.TRAIN.BASE_LR = 0.005
 
 __C.TRAIN.LR = CN()
 
@@ -71,7 +67,7 @@ __C.TRAIN.LR.KWARGS = CN(new_allowed=True)
 
 __C.TRAIN.LR_WARMUP = CN()
 
-__C.TRAIN.LR_WARMUP.WARMUP =  True 
+__C.TRAIN.LR_WARMUP.WARMUP = True
 
 __C.TRAIN.LR_WARMUP.TYPE = 'step'
 
@@ -93,6 +89,11 @@ __C.TRAIN.LOSS_GAMMA = 2.0
 # Dataset options
 # ------------------------------------------------------------------------ #
 __C.DATASET = CN(new_allowed=True)
+
+__C.DATASET.CROP_METHOD = "new"
+
+# validation_split ratio
+__C.DATASET.VALIDATION_SPLIT = 0.0
 
 # Augmentation
 # for template
@@ -132,8 +133,8 @@ __C.DATASET.Background =False
 __C.DATASET.NAMES = ('PCB',)
 
 __C.DATASET.PCB = CN()
-__C.DATASET.PCB.ROOT = './dataset/training_dataset/train/'  #'train_dataset/pcb/train'         # COCO dataset path
-__C.DATASET.PCB.ANNO = './dataset/training_dataset/DATA/'  #'train_dataset/pcb/annotation'
+__C.DATASET.PCB.ROOT = './datasets/train/'  #'train_dataset/pcb/train'         # COCO dataset path
+__C.DATASET.PCB.ANNO = './datasets/train/'  #'train_dataset/pcb/annotation'
 __C.DATASET.PCB.FRAME_RANGE = 1
 __C.DATASET.PCB.NUM_USE = -1
 
@@ -148,7 +149,8 @@ __C.BACKBONE.TYPE = 'res50'
 __C.BACKBONE.KWARGS = CN(new_allowed=True)
 
 # Pretrained backbone weights
-__C.BACKBONE.PRETRAINED = ''
+# __C.BACKBONE.PRETRAINED = ''
+__C.BACKBONE.PRETRAINED = './pretrained_models/resnet50.model'
 
 # Train layers
 __C.BACKBONE.TRAIN_LAYERS = ['layer2', 'layer3', 'layer4']
@@ -157,7 +159,7 @@ __C.BACKBONE.TRAIN_LAYERS = ['layer2', 'layer3', 'layer4']
 __C.BACKBONE.LAYERS_LR = 0.1
 
 # Switch to train layer
-__C.BACKBONE.TRAIN_EPOCH = 200 #200 #10
+__C.BACKBONE.TRAIN_EPOCH = 200
 
 # ------------------------------------------------------------------------ #
 # Adjust layer options
@@ -199,17 +201,16 @@ __C.TRACK.WINDOW_INFLUENCE = 0.44
 __C.TRACK.LR = 0.4
 
 # Exemplar size
-__C.TRACK.EXEMPLAR_SIZE = 127 #127
-
+__C.TRACK.EXEMPLAR_SIZE = 127
 # Instance size
-__C.TRACK.INSTANCE_SIZE = 1200 #1200 #1000  #1200 #1000 #800 #700 #650 #600 #500 #400 #255
+__C.TRACK.INSTANCE_SIZE = 255
+__C.TRACK.SCORE_SIZE = 25
+# 143 #143 #118 #143 #118 #93 #80 #73  #67 #55 #43 #25
 
 # Context amount
 __C.TRACK.CONTEXT_AMOUNT = 0.5
 
 __C.TRACK.STRIDE = 8
-
-__C.TRACK.SCORE_SIZE = 143 #143 #143 #118 #143 #118 #93 #80 #73  #67 #55 #43 #25
 
 __C.TRACK.hanming = True
 

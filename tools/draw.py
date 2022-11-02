@@ -12,10 +12,9 @@ from torchvision import transforms
 
 parser = argparse.ArgumentParser(description='siamcar tracking')
 
-parser.add_argument('--dataset', type=str, default='/tf/SiamCAR/testing_dataset/DATA/',help='dataset path')
-parser.add_argument('--annotation', type=str, default='/tf/SiamCAR/results/UAV123/SiamCAR_epoch1000_batch16_searchSize255_output25_pretrained200_searchTrans__tempsCrop_iou_checkpoint999_1200_text_0.4_0.2_0.3/',help='annotation path')
-
-parser.add_argument('--save', type=str, default='/tf/SiamCAR/tools/result/',help='save path')
+parser.add_argument('--dataset', type=str, default='./datasets/test/', help='dataset path')
+parser.add_argument('--annotation', type=str, default='./results/PCB/snapshot/', help='annotation path')
+parser.add_argument('--save', type=str, default='./results_image/', help='save path')
 
 args = parser.parse_args()
 
@@ -35,7 +34,7 @@ def pil_draw():
                 names.append(fname)
     imgs=sorted(imgs)
     names=sorted(names)
-    
+
     #讀標註檔
     for fname in os.listdir(args.annotation):
         #if fname.endswith(('.txt')):
@@ -43,9 +42,8 @@ def pil_draw():
         item = filePath,fname
         annotation_file.append(item)
     annotation_file=sorted(annotation_file)
-   
-    
-    #畫圖
+
+    # 畫圖
     img_name=''
     for i in range(len(annotation_file)):
         ann_path , fname = annotation_file[i]
@@ -68,20 +66,23 @@ def pil_draw():
         im = Image.open(args.dataset+fname1[0])
         img_name = fname1[0]
         draw = ImageDraw.Draw(im)
-        
+
         length = int(len(annotation[0])/4)
         for j in range (length):
             bbox = [annotation[0][0+j*4],annotation[0][1+j*4],annotation[0][2+j*4],annotation[0][3+j*4]]       
-            draw.rectangle([bbox[0], bbox[1], bbox[2]+bbox[0], bbox[3]+bbox[1]],outline='red',width=4)
+            draw.rectangle([bbox[0], bbox[1], bbox[2]+bbox[0], bbox[3]+bbox[1]], outline=(0, 255, 0), width=4)
 
         del draw
         if not os.path.exists(args.save+img_name[:-4]):
             os.makedirs(args.save+img_name[:-4])
 
-        im.save(args.save+img_name[:-4]+"/"+fname[:-4]+".jpg")
+        save_path = args.save + img_name[:-4] + "/" + fname[:-4] + ".jpg"
+        im.save(save_path)
+        print(f"save result image to: {save_path}")
         #im2 = Image.open(args.save+img_name[:-4]+"/"+fname[:-4]+".jpg")
         #plt.imshow(im2)
         #plt.show()
+
 
 if __name__ == '__main__':
     pil_draw()

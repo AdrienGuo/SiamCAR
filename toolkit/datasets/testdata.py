@@ -56,8 +56,8 @@ class ImageFolderWithSelect(Dataset):#datasets.ImageFolder
                     
                     #讀annotation
                     annotation=[]
-                    anno_path = root+fname[:-4]+'.txt'
-                    anno_path2 = root+fname[:-4]+'.label'
+                    anno_path = os.path.join(root, fname[:-4]+'.txt')
+                    anno_path2 = os.path.join(root, fname[:-4]+'.label')
                     if os.path.isfile(anno_path):
                         check=0
                         f = open(anno_path,'r')
