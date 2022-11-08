@@ -47,6 +47,7 @@ __C.TRAIN.NUM_WORKERS = 0
 
 __C.TRAIN.MOMENTUM = 0.9
 __C.TRAIN.WEIGHT_DECAY = 0.0001
+# TODO: 這個權重要改一下
 __C.TRAIN.CEN_WEIGHT = 1.0
 __C.TRAIN.CLS_WEIGHT = 1.0
 __C.TRAIN.LOC_WEIGHT = 6.0
@@ -93,7 +94,7 @@ __C.DATASET = CN(new_allowed=True)
 __C.DATASET.CROP_METHOD = "new"
 
 # validation_split ratio
-__C.DATASET.VALIDATION_SPLIT = 0.0
+__C.DATASET.VALIDATION_SPLIT = 0.1
 
 # Augmentation
 # for template
@@ -159,7 +160,7 @@ __C.BACKBONE.TRAIN_LAYERS = ['layer2', 'layer3', 'layer4']
 __C.BACKBONE.LAYERS_LR = 0.1
 
 # Switch to train layer
-__C.BACKBONE.TRAIN_EPOCH = 60
+__C.BACKBONE.TRAIN_EPOCH = 200
 
 # ------------------------------------------------------------------------ #
 # Adjust layer options

@@ -1,3 +1,7 @@
+# Author: Adrien Guo
+# ============================
+# 負責裁切 z_img
+
 import cv2
 import ipdb
 import numpy as np
@@ -117,3 +121,28 @@ def crop_tri(img, r, exemplar_size, padding=(0, 0, 0)):
     box = np.array([[0, 0, img_w, img_h]])
 
     return crop_img, box
+
+
+def crop_origin(img, box, bg):
+    img_h, img_w = img.shape[:2]
+    box_pos = [(box[2] + box[0]) / 2., (box[3] + box[1]) / 2.]
+    box_size = [(box[2] - box[0]), (box[3] - box[1])]
+
+    bg = float(bg)
+    assert bg >= 1, f"ERROR, (bg: {bg}) should not smaller than 1"
+    crop_w = box_size[0] * bg
+    crop_h = box_size[1] * bg
+    box = [box_pos[0] - crop_w * 0.5,
+           box_pos[1] - crop_h * 0.5,
+           box_pos[0] + crop_w * 0.5,
+           box_pos[1] + crop_h * 0.5]
+
+    # 不要讓裁切範圍超出原圖
+    box[0] = int(max(0, box[0]))
+    box[1] = int(max(0, box[1]))
+    box[2] = int(min(img_w, box[2]))
+    box[3] = int(min(img_h, box[3]))
+
+    crop_img = img[box[1]: box[3], box[0]: box[2]]
+
+    return crop_img

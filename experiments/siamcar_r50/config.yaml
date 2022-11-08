@@ -27,9 +27,9 @@ TRACK:
 
 TRAIN:
     BASE_LR:  0.005
-    CLS_WEIGHT: 1.0
-    LOC_WEIGHT: 6.0 #3.0
     CEN_WEIGHT: 1.0
+    CLS_WEIGHT: 2.0
+    LOC_WEIGHT: 3.0 #3.0
     NUM_CLASSES: 2
     NUM_CONVS: 4
     PRIOR_PROB: 0.01
@@ -41,12 +41,20 @@ TRAIN:
         KWARGS:
             start_lr: 0.005
             end_lr: 0.0005
+            # start_lr: 0.0003125  # (1 / 16)
+            # end_lr: 0.00003125  # (1 / 16)
+            # start_lr: 0.00015625  # (1 / 32)
+            # end_lr: 0.00015625  # (1 / 32)
     LR_WARMUP:
         TYPE: 'step'
         EPOCH: 5
         KWARGS:
             start_lr: 0.001
             end_lr: 0.005
+            # start_lr: 0.0000625  # (1 / 16)
+            # end_lr: 0.0003125  # (1 / 16)
+            # start_lr: 0.00003125  # (1 / 32)
+            # end_lr: 0.00015625  # (1 / 32)
             step: 1
 
 DATASET:

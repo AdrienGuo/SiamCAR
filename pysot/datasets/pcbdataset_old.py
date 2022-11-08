@@ -459,4 +459,4 @@ class PCBDataset(Dataset): #先讀所有圖片，再以類別去讀anno
 
         # box: (n, 5) #corner, #real
         # cls: (size, size) #zeros
-        return img_path, template, search, cls, box, z_box, r
+        return img_name, img_path, template, search, cls, box, z_box, r

@@ -67,9 +67,7 @@ def draw_box(image, boxes, type=None, scores: np = None):
     return image_new
 
 
-def draw_preds(sub_dir, search_image, scores, annotation_path, idx):
-    imgs = []
-    names = []
+def draw_preds(search_image, scores, annotation_path, idx):
     preds = []
     pred_image = None
 

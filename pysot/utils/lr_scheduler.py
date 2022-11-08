@@ -123,8 +123,8 @@ class WarmUPScheduler(LRScheduler):
 
 
 LRs = {
-    'log': LogScheduler,
-    'step': StepScheduler,
+    'log': LogScheduler,  # lr
+    'step': StepScheduler,  # warmup
     'multi-step': MultiStepScheduler,
     'linear': LinearStepScheduler,
     'cos': CosStepScheduler}

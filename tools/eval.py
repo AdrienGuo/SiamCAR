@@ -38,6 +38,7 @@ parser.add_argument('--neg', type=float, default=0.0, help='negative pair')
 parser.add_argument('--bg', type=str, help='background of template')
 parser.add_argument('--epoch', type=int, help='epoch')  # for train
 parser.add_argument('--batch_size', type=int, help='batch size')  # for train
+parser.add_argument('--accum_iter', type=int, help='accumulate gradient iteration')  # for train
 parser.add_argument('--cfg', type=str, default='./experiments/siamcar_r50/config.yaml', help='configuration of tracking')
 # parser.add_argument('--datasetName', type=str, default='PCB', help='dataset name')  # OTB100 LaSOT UAV123 GOT-10k
 args = parser.parse_args()
@@ -164,6 +165,8 @@ def evaluate(test_loader, tracker):
             pred_boxes.append(outputs['pred_boxes'])
             label_boxes.append(gt_boxes.tolist())
 
+            # ipdb.set_trace()
+
             # precision, recall = calculate_metrics([outputs['top_scores']], [outputs['pred_boxes']], [gt_boxes.tolist()])
         precision, recall = calculate_metrics(pred_scores, pred_boxes, label_boxes)
         precision = precision * 100
@@ -210,4 +213,4 @@ if __name__ == "__main__":
     print("Start evaluating...")
     metrics = evaluate(test_loader, tracker)
 
-    print("=" * 20, "Done!", "=" * 20, "\n")
+    print("=" * 20, "DONE!", "=" * 20, "\n")

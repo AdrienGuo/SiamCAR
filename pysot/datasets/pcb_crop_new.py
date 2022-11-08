@@ -47,10 +47,10 @@ class PCBCrop:
         return img
 
     def get_search(self, img, gt_boxes, z_box):
-        gt_boxes = center2corner(gt_boxes)
-        gt_boxes = ratio2real(img, gt_boxes)
-        z_box = center2corner(z_box)
-        z_box = ratio2real(img, z_box)
+        # gt_boxes = center2corner(gt_boxes)
+        # gt_boxes = ratio2real(img, gt_boxes)
+        # z_box = center2corner(z_box)
+        # z_box = ratio2real(img, z_box)
 
         img, gt_boxes, z_box, r, spatium = self._search_crop(
             img,

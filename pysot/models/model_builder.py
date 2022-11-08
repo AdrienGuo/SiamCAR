@@ -99,14 +99,18 @@ class ModelBuilder(nn.Module):
         # features: (b, c=256, h, w)
         features = self.down(features)
 
-        # Classificaitn, Regression
+        # Classificaitn, Regression, Centerness
         cls, loc, cen = self.car_head(features)
 
-        # 做出 meshgrid
-        # locations: (size * size, 2)
-        locations = compute_locations(cls, cfg.TRACK.STRIDE)
+        # 做出 meshgrid，用 zf 來算出 shift_w, shify_h
+        # TODO: 之後可以改成用 z_img 來算出 shift_w, shift_h
+        # locations: (size_h * size_w, [x, y])
+        locations = compute_locations(cls, cfg.TRACK.STRIDE, x_img)
+        # 起點好像會不太準，終點還行
         # cls: (b, 2, h, w) -> (b, 1, h, w, 2)
         cls = self.log_softmax(cls)
+
+        # ipdb.set_trace()
 
         # 算 loss
         cen_loss, cls_loss, loc_loss = self.loss_evaluator(

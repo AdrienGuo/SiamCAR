@@ -36,7 +36,7 @@ class PCBDataset():
     def __init__(self, args, mode) -> None:
         super(PCBDataset, self).__init__()
 
-        self.root = args.dataset_path
+        self.root = args.test_dataset
         images, templates, searches = self._make_dataset(self.root)
         images, templates, searches = self._filter_dataset(
             images, templates, searches, args.criteria)
@@ -65,8 +65,8 @@ class PCBDataset():
 
         for root, _, files in os.walk(dir_path):
             img_dir = root
-            z_regex = re.compile(r"^(Template)")    # 開頭要有 Template
-            x_regex = re.compile(r"^(?!Template)")    # 開頭不能有 Template
+            z_regex = re.compile(r"^(Template)")  # 開頭要有 Template
+            x_regex = re.compile(r"^(?!Template)")  # 開頭不能有 Template
             zs = [file for file in files if z_regex.match(file)]
             xs = [file for file in files if x_regex.match(file)]
             for z in zs:
@@ -98,13 +98,17 @@ class PCBDataset():
             # calculate templates new w, h
             z_w = z_w * r
             z_h = z_h * r
-            if criteria == "below":
-                # if max(templates w, h) >= 64
-                if max(z_w, z_h) <= 64:
+            if criteria == "small":
+                if max(z_w, z_h) <= 32:
                     inds_match.append(idx)
-            elif criteria == "above":
+            elif criteria == "mid":
+                if 32 < max(z_w, z_h) <= 64:
+                    inds_match.append(idx)
+            elif criteria == "big":
                 if max(z_w, z_h) > 64:
                     inds_match.append(idx)
+            else:
+                assert False, "ERROR, chosen criteria is wrong!"
         images = [images[i] for i in inds_match]
         templates = [templates[i] for i in inds_match]
         searches = [searches[i] for i in inds_match]
@@ -194,7 +198,7 @@ class PCBDataset():
         cls = np.zeros((cfg.TRAIN.OUTPUT_SIZE, cfg.TRAIN.OUTPUT_SIZE), dtype=np.int64)
         cls = torch.as_tensor(cls, dtype=torch.int64)
 
-        return img_path, z_img, x_img, cls, box, z_box, r
+        return img_name, img_path, z_img, x_img, cls, box, z_box, r
 
         return {
             'img_path': search,

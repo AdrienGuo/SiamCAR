@@ -18,7 +18,7 @@ import torch.nn as nn
 import wandb
 from pysot.core.config import cfg
 from pysot.datasets.collate import collate_fn_new
-# === 選擇 new / old 的裁切方式 ===
+# === 選擇 new / origin 的裁切方式 ===
 # from pysot.datasets.pcbdataset_multi_text import PCBDataset
 from pysot.datasets.pcbdataset_new import PCBDataset
 from pysot.models.model_builder import ModelBuilder
@@ -53,6 +53,7 @@ parser.add_argument('--neg', type=float, default=0.0, help='negative pair')
 parser.add_argument('--bg', type=str, help='background of template')
 parser.add_argument('--epoch', type=int, help='epoch')
 parser.add_argument('--batch_size', type=int, help='batch size')
+parser.add_argument('--accum_iter', type=int, help='accumulate gradient iteration')
 parser.add_argument('--cfg', type=str, default='./experiments/siamcar_r50/config.yaml', help='configuration of tracking')
 parser.add_argument('--seed', type=int, default=123456, help='random seed')
 parser.add_argument('--local_rank', type=int, default=0, help='compulsory for pytorch launcer')
@@ -65,8 +66,6 @@ class SiamCARTrainer(object):
         
         rank, world_size = dist_init()
 
-        # load cfg
-        cfg.merge_from_file(args.cfg)
         if rank == 0:
             if not os.path.exists(cfg.TRAIN.LOG_DIR):
                 os.makedirs(cfg.TRAIN.LOG_DIR)
@@ -120,7 +119,7 @@ class SiamCARTrainer(object):
         print(f"Train dataset size: {len(train_dataset)}")
         print(f"Val dataset size: {len(val_dataset)}")
         print(f"Test dataset size: {len(test_dataset)}")
-        assert len(train_dataset) != 0, "ERROR, dataset is empty !!"
+        assert len(train_dataset) != 0, "ERROR, dataset is empty!!"
 
         # train_sampler = None
         # if get_world_size() > 1:
@@ -211,7 +210,9 @@ class SiamCARTrainer(object):
                                          weight_decay=cfg.TRAIN.WEIGHT_DECAY)
 
         self.lr_scheduler = build_lr_scheduler(self.optimizer, epochs=args.epoch)
-        self.lr_scheduler.step(cfg.TRAIN.START_EPOCH)
+        # Warning:
+        # https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
+        # self.lr_scheduler.step(cfg.TRAIN.START_EPOCH)
 
     def CompilModel(self):
         # create model
@@ -275,8 +276,8 @@ class SiamCARTrainer(object):
             train_loss = dict(cen=0.0, cls=0.0, loc=0.0, total=0.0)
             val_loss = dict(cen=0.0, cls=0.0, loc=0.0, total=0.0)
 
-            self.lr_scheduler.step(epoch)
-            cur_lr = self.lr_scheduler.get_cur_lr()
+            # self.lr_scheduler.step(epoch)
+            # cur_lr = self.lr_scheduler.get_cur_lr()
 
             end = time.time()
 
@@ -286,8 +287,6 @@ class SiamCARTrainer(object):
             self.model.train()
             for idx, data in enumerate(self.train_loader):
                 # one batch
-                # if epoch + 1 == args.epoch:
-                #     return
 
                 data_time = average_reduce(time.time() - end)
 
@@ -295,39 +294,40 @@ class SiamCARTrainer(object):
 
                 # ipdb.set_trace()
 
-                loss = outputs['total'].mean()
-
-                print(
-                    f"cen_loss: {outputs['cen']:<6.3f}"
-                    f" | cls_loss: {outputs['cls']:<6.3f}"
-                    f" | loc_loss: {outputs['loc']:<6.3f}"
-                    f" | total_loss: {outputs['total']:<6.3f}"
-                )
-
                 # train_loss 會個別對應 outputs 的 key 後疊加
                 train_loss = {key: value + outputs[key] for key, value in train_loss.items()}
 
-                if is_valid_number(loss.data.item()):
-                    self.optimizer.zero_grad()
-                    loss.backward()
-                    reduce_gradients(self.model)
+                loss = outputs['total'].mean()
+                loss.backward()
+                # accumulate gradient
+                if ((idx + 1) % args.accum_iter) == 0 or ((idx + 1) == len(self.train_loader)):
+                    if is_valid_number(loss.data.item()):
+                        reduce_gradients(self.model)
+                        # clip gradient
+                        clip_grad_norm_(self.model.parameters(), cfg.TRAIN.GRAD_CLIP)
+                        self.optimizer.step()
 
-                    # clip gradient
-                    clip_grad_norm_(self.model.parameters(), cfg.TRAIN.GRAD_CLIP)
-                    self.optimizer.step()
+                        self.optimizer.zero_grad()
+
+                    print(
+                        f"cen_loss: {outputs['cen']:<6.3f}"
+                        f" | cls_loss: {outputs['cls']:<6.3f}"
+                        f" | loc_loss: {outputs['loc']:<6.3f}"
+                        f" | total_loss: {outputs['total']:<6.3f}"
+                    )
 
                 batch_time = time.time() - end
-                batch_info = {}
-                batch_info['batch_time'] = average_reduce(batch_time)
-                batch_info['data_time'] = average_reduce(data_time)
-                batch_record['batch'] = idx
-                batch_record['loss'] = train_loss['total'] / (idx + 1)
-                self.cb.on_batch_end(batch_record)
+                # batch_info = {}
+                # batch_info['batch_time'] = average_reduce(batch_time)
+                # batch_info['data_time'] = average_reduce(data_time)
+                # batch_record['batch'] = idx
+                # batch_record['loss'] = train_loss['total'] / (idx + 1)
+                # self.cb.on_batch_end(batch_record)
 
-                for k, v in sorted(outputs.items()):
-                    batch_info[k] = average_reduce(v.mean().data.item())
+                # for k, v in sorted(outputs.items()):
+                #     batch_info[k] = average_reduce(v.mean().data.item())
 
-                average_meter.update(**batch_info)    # 對所有batch_size的損失取平均
+                # average_meter.update(**batch_info)    # 對所有batch_size的損失取平均
 
                 # if (idx + 1) % cfg.TRAIN.PRINT_FREQ == 0:
                 #     info = "Epoch: [{}][{}/{}] lr: {:.6f}\n".format(
@@ -347,8 +347,11 @@ class SiamCARTrainer(object):
                 #                 average_meter.batch_time.avg,
                 #                 args.epoch * num_per_epoch)
 
-                if self.stop_training:
-                    return
+            # Warning:
+            # https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
+            self.lr_scheduler.step()
+            cur_lr = self.lr_scheduler.get_cur_lr()
+            print(f"Curr lr: {cur_lr}")
 
             train_loss = {key: value / len(self.train_loader) for key, value in train_loss.items()}
 
@@ -357,11 +360,6 @@ class SiamCARTrainer(object):
             self.cb.on_epoch_end(epoch_record)
 
             elapsed = time.time() - end
-
-            # self.tb_writer.add_scalar('cen_loss', train_loss['cen'], epoch + 1)
-            # self.tb_writer.add_scalar('cls_loss', train_loss['cls'], epoch + 1)
-            # self.tb_writer.add_scalar('loc_loss', train_loss['loc'], epoch + 1)
-            # self.tb_writer.add_scalar('total_loss', train_loss['total'], epoch + 1)
             print(f"({elapsed:.3f}s, {elapsed / len(self.train_loader.dataset):.3}s/img)")
 
             print("--- Train ---")
@@ -371,26 +369,24 @@ class SiamCARTrainer(object):
                 f" | loc_loss: {train_loss['loc']:<6.3f}"
                 f" | total_loss: {train_loss['total']:<6.3f}"
             )
-            # print (f"\r(cls_loss:{train_loss['cls']:6.4f}, loc_loss:{train_loss['loc']:6.4f},cen_loss{train_loss['cen']:6.4f})"
-            #        f"\tTotal_loss:{train_loss['total']:6.4f}")
 
             ######################################
             # Validating
             ######################################
             self.model.eval()
 
-            # for idx, data in enumerate(self.val_loader):
-            #     with torch.no_grad():
-            #         outputs = self.model(data)
-            #     val_loss = {key: value + outputs[key] for key, value in val_loss.items()}
-            # val_loss = {key: value / len(self.val_loader) for key, value in val_loss.items()}
-            # print("--- Validation ---")
-            # print(
-            #     f"cen_loss: {val_loss['cen']:<6.3f}"
-            #     f" | cls_loss: {val_loss['cls']:<6.3f}"
-            #     f" | loc_loss: {val_loss['loc']:<6.3f}"
-            #     f" | total_loss: {val_loss['total']:<6.3f}"
-            # )
+            for idx, data in enumerate(self.val_loader):
+                with torch.no_grad():
+                    outputs = self.model(data)
+                val_loss = {key: value + outputs[key] for key, value in val_loss.items()}
+            val_loss = {key: value / len(self.val_loader) for key, value in val_loss.items()}
+            print("--- Validation ---")
+            print(
+                f"cen_loss: {val_loss['cen']:<6.3f}"
+                f" | cls_loss: {val_loss['cls']:<6.3f}"
+                f" | loc_loss: {val_loss['loc']:<6.3f}"
+                f" | total_loss: {val_loss['total']:<6.3f}"
+            )
 
             ######################################
             # Evaluating
@@ -398,7 +394,7 @@ class SiamCARTrainer(object):
             if (epoch + 1) % cfg.TRAIN.EVAL_FREQ == 0:
                 dummy_model_dir = "./save_models/dummy_model"
                 create_dir(dummy_model_dir)
-                dummy_model_name = "dummy_model"
+                dummy_model_name = "dummy_model_1"
                 dummy_model_path = os.path.join(dummy_model_dir, f"{dummy_model_name}.pth")
                 torch.save({
                     'epoch': epoch,
@@ -416,8 +412,8 @@ class SiamCARTrainer(object):
 
                 logger.info("Train evaluating...")
                 train_metrics = evaluate(self.train_eval_loader, tracker)
-                # logger.info("Validation evaluating...")
-                # val_metrics = evaluate(self.val_eval_loader, tracker)
+                logger.info("Validation evaluating...")
+                val_metrics = evaluate(self.val_eval_loader, tracker)
                 logger.info("Test evaluating...")
                 test_metrics = evaluate(self.test_loader, tracker)
 
@@ -426,10 +422,10 @@ class SiamCARTrainer(object):
                         "Precision": train_metrics['precision'],
                         "Recall": train_metrics['recall']
                     },
-                    # "val_metrics": {
-                    #     "Precision": val_metrics['precision'],
-                    #     "Recall": val_metrics['recall']
-                    # },
+                    "val_metrics": {
+                        "Precision": val_metrics['precision'],
+                        "Recall": val_metrics['recall']
+                    },
                     "test_metrics": {
                         "Precision": test_metrics['precision'],
                         "Recall": test_metrics['recall']
@@ -443,12 +439,12 @@ class SiamCARTrainer(object):
                     "loc_loss": train_loss['loc'],
                     "total_loss": train_loss['total']
                 },
-                # "val": {
-                #     "cen_loss": val_loss['cen'],
-                #     "cls_loss": val_loss['cls'],
-                #     "loc_loss": val_loss['loc'],
-                #     "total_loss": val_loss['total']
-                # },
+                "val": {
+                    "cen_loss": val_loss['cen'],
+                    "cls_loss": val_loss['cls'],
+                    "loc_loss": val_loss['loc'],
+                    "total_loss": val_loss['total']
+                },
                 "epoch": epoch + 1
             }, commit=True)
 
@@ -456,7 +452,9 @@ class SiamCARTrainer(object):
             # Save model
             ######################################
             if ((epoch + 1) % cfg.TRAIN.SAVE_MODEL_FREQ) == 0:
-                model_dir = os.path.join(cfg.TRAIN.MODEL_DIR + f"{args.dataset_name}_{args.criteria}_neg{args.neg}_x{cfg.TRAIN.SEARCH_SIZE}_bg{args.bg}_e{args.epoch}_b{args.batch_size}")
+                model_dir = os.path.join(
+                    cfg.TRAIN.MODEL_DIR, args.dataset_name, args.criteria,
+                    f"{args.dataset_name}_{args.criteria}_neg{args.neg}_x{cfg.TRAIN.SEARCH_SIZE}_bg{args.bg}_e{args.epoch}_b{args.batch_size}")
                 create_dir(model_dir)
                 model_path = os.path.join(model_dir + f"/model_e{epoch + 1}.pth")
                 torch.save({
@@ -465,8 +463,6 @@ class SiamCARTrainer(object):
                     'optimizer': self.optimizer.state_dict()
                 }, model_path)
                 print(f"Save model to: {model_path}")
-
-        self.cb.on_train_end()
 
     def getTrainSampleNumber(self):
         return len(self.train_loader.dataset)
@@ -489,20 +485,29 @@ class SiamCARTrainer(object):
 
 
 if __name__ == '__main__':
+
+    # load cfg
+    cfg.merge_from_file(args.cfg)
+
     # PermissionError
     os.environ['WANDB_DIR'] = './wandb_titan'
     # constants = {
     #     "Dataset": args.dataset_name,
     #     "Criteria": args.criteria,
-    #     "Negative ratio": args.neg,
+    #     "Validation Ratio": cfg.DATASET.VALIDATION_SPLIT,
+    #     "Negative Ratio": args.neg,
     #     "Background": args.bg,
-    #     "Search size": cfg.TRAIN.SEARCH_SIZE,
-    #     "crop_method": cfg.DATASET.CROP_METHOD,
-    #     "score_size": cfg.TRAIN.OUTPUT_SIZE,
     #     "Epochs": args.epoch,
     #     "Batch": args.batch_size,
-    #     "lr": cfg.TRAIN.BASE_LR,
-    #     "weight_decay": cfg.TRAIN.WEIGHT_DECAY
+    #     "Accumulate iter": args.accum_iter,
+    #     "lr": cfg.TRAIN.LR.KWARGS.start_lr,
+    #     "weight_decay": cfg.TRAIN.WEIGHT_DECAY,
+    #     "Model Pretrained": cfg.TRAIN.PRETRAINED,
+    #     "Backbone Pretrained": cfg.BACKBONE.PRETRAINED,
+    #     "Backbone Train Epoch": cfg.BACKBONE.TRAIN_EPOCH,
+    #     "cen weight": cfg.TRAIN.CEN_WEIGHT,
+    #     "cls weight": cfg.TRAIN.CLS_WEIGHT,
+    #     "loc weight": cfg.TRAIN.LOC_WEIGHT,
     # }
     # wandb.init(
     #     project="SiamCAR",

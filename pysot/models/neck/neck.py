@@ -15,18 +15,21 @@ class AdjustLayer(nn.Module):
         self.downsample = nn.Sequential(
             nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False),
             nn.BatchNorm2d(out_channels),
-            )
+        )
 
     def forward(self, x):
         x = self.downsample(x)
-        
-        
+
+        # 就在這裡!! 會把 template feature map 做 crop
+        """ 原文 (SiamRPN++)
+        Thus we crop the center 7 × 7 regions [41] as the template
+        feature where each feature cell can still capture the entire
+        target region.
+        """
         if x.size(3) < 20:
             l = 4
             r = l + 7
             x = x[:, :, l:r, l:r]
-         
-        
         return x
 
 
