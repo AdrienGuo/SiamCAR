@@ -102,8 +102,8 @@ class IOULoss(nn.Module):
         target_right = target[:, 2]
         target_bottom = target[:, 3]
 
-        pred_aera = (pred_left + pred_right) * (pred_top + pred_bottom)
-        target_aera = (target_left + target_right) * (target_top + target_bottom)
+        pred_area = (pred_left + pred_right) * (pred_top + pred_bottom)
+        target_area = (target_left + target_right) * (target_top + target_bottom)
 
         w_intersect = torch.min(pred_left, target_left) \
                       + torch.min(pred_right, target_right)
@@ -111,7 +111,11 @@ class IOULoss(nn.Module):
                       + torch.min(pred_top, target_top)
 
         area_intersect = w_intersect * h_intersect
-        area_union = target_aera + pred_aera - area_intersect
+        area_union = target_area + pred_area - area_intersect
+
+        # TODO: Check no underflow or overflow
+        # pred_area, target_area, area_intersect, area_union
+        # ipdb.set_trace()
 
         losses = -torch.log((area_intersect + 1.0) / (area_union + 1.0))
 
@@ -134,21 +138,19 @@ class GIOULoss(nn.Module):
         target_right = target[:, 2]
         target_bottom = target[:, 3]
 
-        target_aera = (target_left + target_right) * \
-                      (target_top + target_bottom)
-        pred_aera = (pred_left + pred_right) * \
-                    (pred_top + pred_bottom)
+        target_area = (target_left + target_right) * (target_top + target_bottom)
+        pred_area = (pred_left + pred_right) * (pred_top + pred_bottom)
 
-        w_intersect = torch.min(pred_left, target_left) + \
-                      torch.min(pred_right, target_right)
-        h_intersect = torch.min(pred_bottom, target_bottom) + \
-                      torch.min(pred_top, target_top)
+        w_intersect = torch.min(pred_left, target_left) \
+            + torch.min(pred_right, target_right)
+        h_intersect = torch.min(pred_bottom, target_bottom) \
+            + torch.min(pred_top, target_top)
 
         area_intersect = w_intersect * h_intersect
-        area_union = target_aera + pred_aera - area_intersect
-        
+        area_union = target_area + pred_area - area_intersect
+
         iou = (area_intersect + 1.0) / (area_union + 1.0)
-        
+
         # enclosure
         gw_intersect = torch.max(pred_left, target_left) + \
                       torch.max(pred_right, target_right)

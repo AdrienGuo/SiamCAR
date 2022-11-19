@@ -30,8 +30,8 @@ __C.TRAIN.RESUME = ''
 
 
 # Whole model pretrained
-__C.TRAIN.PRETRAINED = ''
-# __C.TRAIN.PRETRAINED = './tools/snapshot/model_general.pth'
+# __C.TRAIN.PRETRAINED = ''
+__C.TRAIN.PRETRAINED = './tools/snapshot/model_general.pth'
 # __C.TRAIN.PRETRAINED = './save_models/dummy_model_titan/dummy_model.pth'
 # __C.TRAIN.PRETRAINED = './save_models/all/big/all_big_neg0.0_x255_bg1.0_e1000_b1/model_e950.pth'
 
@@ -94,7 +94,7 @@ __C.DATASET = CN(new_allowed=True)
 __C.DATASET.CROP_METHOD = "new"
 
 # validation_split ratio
-__C.DATASET.VALIDATION_SPLIT = 0.1
+__C.DATASET.VALIDATION_SPLIT = 0.0
 
 # Augmentation
 # for template
@@ -160,7 +160,7 @@ __C.BACKBONE.TRAIN_LAYERS = ['layer2', 'layer3', 'layer4']
 __C.BACKBONE.LAYERS_LR = 0.1
 
 # Switch to train layer
-__C.BACKBONE.TRAIN_EPOCH = 1
+__C.BACKBONE.TRAIN_EPOCH = 200
 
 # ------------------------------------------------------------------------ #
 # Adjust layer options

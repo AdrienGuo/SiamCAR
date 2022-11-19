@@ -68,7 +68,6 @@ def create_img_dir(save_dir, img_name) -> dict:
 
 
 def save_fail_img(img_name, img, z_img, x_img, pred_img, heatmap, idx):
-# def save_fail_img(img_name, img, z_img, x_img, pred_img, idx):
     path_dir_map = create_img_dir(fail_dir, img_name)
     origin_path = os.path.join(path_dir_map['origin'], f"{img_name}.jpg")
     save_image(img, origin_path)

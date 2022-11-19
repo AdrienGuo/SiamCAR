@@ -28,6 +28,7 @@ from toolkit.statistics import overlap_ratio_one
 # from toolkit.datasets import DatasetFactory
 from torch.utils.data import DataLoader, Subset
 from torchvision import transforms
+from torch.cuda.amp import autocast
 
 torch.set_num_threads(1)
 
@@ -130,15 +131,16 @@ def evaluate(test_loader, tracker):
             start = time.time()
 
             # 用 template image 將 tracker 初始化
-            # z_crop = tracker.init(image, gt_box)
-            _ = tracker.init(z_img, z_box)
+            with autocast():
+                _ = tracker.init(z_img, z_box)
             # _ = tracker.init(img, z_box)
 
             ######################################
             # Do tracking (predict)
             ######################################
             # 用 search image 進行 "track" 的動作
-            outputs = tracker.track(x_img, hp)
+            with autocast():
+                outputs = tracker.track(x_img, hp)
             # outputs = tracker.track(img, hp)
 
             # toc = cv2.getTickCount()
@@ -179,7 +181,7 @@ if __name__ == "__main__":
     parser.add_argument('--criteria', type=str, default='', help='criteria of dataset')
     parser.add_argument('--neg', type=float, default=0.0, help='negative pair')
     parser.add_argument('--bg', type=str, help='background of template')
-    parser.add_argument('--cfg', type=str, default='./experiments/siamcar_r50/config_amy.yaml', help='configuration of tracking')
+    parser.add_argument('--cfg', type=str, default='./experiments/siamcar_r50/config.yaml', help='configuration of tracking')
     args = parser.parse_args()
 
     cfg.merge_from_file(args.cfg)  # 不加 ModelBuilder() 會出問題ㄟ ??
@@ -199,7 +201,7 @@ if __name__ == "__main__":
     # Create model
     model = ModelBuilder()
     # Load model
-    model = load_pretrain(model, args.model).cuda().eval()
+    model = load_pretrain(model, args.model).cuda().train()
     # Build tracker
     tracker = SiamCARTracker(model, cfg.TRACK)
 

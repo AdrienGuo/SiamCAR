@@ -36,7 +36,7 @@ if pyv[0] == '3':
 
     
 class PCBDataset(Dataset):
-    def __init__(self, args, mode: str, loader=default_loader):
+    def __init__(self, args, mode : str, loader = default_loader):
         """ 代號
             z: template
             x: search
@@ -57,26 +57,27 @@ class PCBDataset(Dataset):
         self.searches = searches
 
         # zf_size_min: smallest z size after res50 backbone
-        zf_size_min = 2
+        zf_size_min = 4
         # PCBCrop: Crop template & search (preprocess)
         self.pcb_crop = PCBCrop(zf_size_min)
 
-    # def _find_classes(self,directory: str):
-    #     classes = sorted(entry.name for entry in os.scandir(directory) if entry.is_dir())
-    #     if not classes:
-    #         raise FileNotFoundError(f"Couldn't find any class folder in {directory}.")
-    #     class_to_idx = {cls_name: i for i, cls_name in enumerate(classes)}
-    #     return classes, class_to_idx
-    
     def _make_dataset(self, directory: str):
         images = []
         templates = []
         searches = []
 
+        imgs_exclude = []
+        if self.args.criteria == "mid":
+            imgs_exclude = ['17_ic_ic_20200810_solder_40.bmp', '17_ic_Sot23_20200820_solder_81.bmp', '5_sod_sod (7).jpg']
+            # pass
+
         # directory = os.path.expanduser(directory)
         for root, _, files in sorted(os.walk(directory, followlinks=True)):
             for file in sorted(files):    # 排序
                 box = []
+                if file in imgs_exclude:
+                    # These images cause OOM
+                    continue
                 if file.endswith(('.jpg', '.png', 'bmp')):
                     img_path = os.path.join(root, file)
                     anno_path = os.path.join(root, file[:-3] + "txt")
