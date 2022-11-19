@@ -23,7 +23,8 @@ class SiamCARTracker(SiameseTracker):
         hanning = np.hanning(cfg.SCORE_SIZE)
         self.window = np.outer(hanning, hanning)
         self.model = model
-        self.model.eval()
+        # 一定要特別標起來紀念一下 (11/08/2022)
+        # self.model.eval()
 
     def _convert_cls(self, cls):
         cls = F.softmax(cls[:, :, :, :], dim=1).data[:, 1, :, :].cpu().numpy()
@@ -37,13 +38,10 @@ class SiamCARTracker(SiameseTracker):
         # Debug
         if pad.min() < 0:
             print(f"invalid pad value: {pad.min()}")
-            # pad[pad < 0] = 0.0
         if w.min() < 0:
             print(f"ERROR, invalid w value: {w.min()}")
-            # w[w < 0] = 0.0
         if h.min() < 0:
             print(f"ERROR, invalid w value: {h.min()}")
-            # h[h < 0] = 0.0
         return np.sqrt((w + pad) * (h + pad))
 
     def cal_penalty(self, ltrbs, penalty_lk):
@@ -335,9 +333,9 @@ class SiamCARTracker(SiameseTracker):
         # Get pred outputs.
         outputs = self.model.track(x_img)
 
-        cls = self._convert_cls(outputs['cls']).squeeze(axis=0)
-
         # ipdb.set_trace()
+
+        cls = self._convert_cls(outputs['cls']).squeeze(axis=0)
 
         cen = outputs['cen'].data.cpu().numpy()
         if outputs['cen'].shape[-1] != 1:
@@ -381,8 +379,10 @@ class SiamCARTracker(SiameseTracker):
 
         # ipdb.set_trace()
 
-        scale_score = 0 / cfg.TRACK.SCORE_SIZE  # useless
+        scale_score = upsize_h / cfg.TRACK.SCORE_SIZE  # useless
 
+        # 兩種模式:
+        # 使用 upsize 的模式
         # bbox, rescore = self.get_center_up(
         #     hp_score_up,  # useless
         #     p_score_up,
@@ -392,6 +392,7 @@ class SiamCARTracker(SiameseTracker):
         #     hp,
         #     cls_up
         # )
+        # 使用原本 size 的模式
         bbox, rescore = self.get_center(
             p_score,
             ltrbs,
@@ -437,5 +438,6 @@ class SiamCARTracker(SiameseTracker):
         return {
             'top_scores': top_scores,
             'pred_boxes': boxes,
-            'x_img': x_img
+            'x_img': x_img,
+            'cls': cls  # for heamap
         }

@@ -13,6 +13,8 @@ wandb/
 wandb_titan/
 save_models/
 train_dataset/
+results_amy/
+.vscode/
 
 
 # Byte-compiled / optimized / DLL files

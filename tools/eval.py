@@ -17,9 +17,10 @@ from PIL import Image, ImageDraw, ImageFont
 from pysot.core.config import cfg
 from pysot.datasets.collate import collate_fn_new
 # 記得要改
-from pysot.datasets.pcbdataset_new import PCBDataset
+from pysot.datasets.pcbdataset_origin import PCBDataset
 from pysot.models.model_builder import ModelBuilder
 from pysot.tracker.siamcar_tracker import SiamCARTracker
+# from pysot.tracker.siamcar_tracker_amy import SiamCARTracker
 from pysot.utils.bbox import get_axis_aligned_bbox
 from pysot.utils.check_image import draw_preds, save_image
 from pysot.utils.model_load import load_pretrain
@@ -28,39 +29,22 @@ from toolkit.statistics import overlap_ratio_one
 from torch.utils.data import DataLoader, Subset
 from torchvision import transforms
 
-parser = argparse.ArgumentParser(description='siamcar tracking')
-parser.add_argument('--model', type=str, default='', help='model to eval')
-parser.add_argument('--dataset_name', type=str, default='', help='dataset name')
-parser.add_argument('--dataset', type=str, default='', help='training dataset')
-parser.add_argument('--test_dataset', type=str, default='', help='testing dataset')
-parser.add_argument('--criteria', type=str, default='', help='criteria of dataset')
-parser.add_argument('--neg', type=float, default=0.0, help='negative pair')
-parser.add_argument('--bg', type=str, help='background of template')
-parser.add_argument('--epoch', type=int, help='epoch')  # for train
-parser.add_argument('--batch_size', type=int, help='batch size')  # for train
-parser.add_argument('--accum_iter', type=int, help='accumulate gradient iteration')  # for train
-parser.add_argument('--cfg', type=str, default='./experiments/siamcar_r50/config.yaml', help='configuration of tracking')
-# parser.add_argument('--datasetName', type=str, default='PCB', help='dataset name')  # OTB100 LaSOT UAV123 GOT-10k
-args = parser.parse_args()
-
 torch.set_num_threads(1)
 
 
-def calculate_metrics(pred_scores, pred_boxes, label_boxes):
+def calculate_metrics(pred_boxes, label_boxes):
     """
     Args:
         pred_boxes (list): (data_num, pred_num, 4)
         label_boxes (list): (data_num, label_num, 4)
     """
-    assert len(pred_scores) == len(pred_boxes), "length of pred_scores and pred_boxes should be the same"
     assert len(pred_boxes) == len(label_boxes), "length of pred_boxes and label_boxes should be the same"
 
     tp = list()
     fp = list()
     boxes_num = list()
 
-    lens = len(pred_scores)
-    for idx in range(lens):
+    for idx in range(len(pred_boxes)):
         # 一個 data
         tp_one = torch.zeros(len(pred_boxes[idx]))
         fp_one = torch.zeros(len(pred_boxes[idx]))
@@ -98,10 +82,9 @@ def evaluate(test_loader, tracker):
     # [0.4, 0.2, 0.3]
     hp = {'lr': params[0], 'penalty_k': params[1], 'window_lr': params[2]}
 
-    pred_scores = list()
-    pred_boxes = list()
+    all_pred_boxes = list()
     pred_classes = list()
-    label_boxes = list()
+    all_gt_boxes = list()
     label_classes = list()
 
     clocks = 0
@@ -120,8 +103,9 @@ def evaluate(test_loader, tracker):
             x_img = data['x_img'].cuda()
             gt_boxes = data['gt_boxes']
 
-            # print(f"Load image from: {img_path}")
-            # img = cv2.imread(img_path)
+            print(f"Load image from: {img_path}")
+            img = cv2.imread(img_path)
+            # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
             ######################################
             # 調整 z_box, gt_boxes
@@ -148,12 +132,14 @@ def evaluate(test_loader, tracker):
             # 用 template image 將 tracker 初始化
             # z_crop = tracker.init(image, gt_box)
             _ = tracker.init(z_img, z_box)
+            # _ = tracker.init(img, z_box)
 
             ######################################
-            # Do tracking
+            # Do tracking (predict)
             ######################################
             # 用 search image 進行 "track" 的動作
             outputs = tracker.track(x_img, hp)
+            # outputs = tracker.track(img, hp)
 
             # toc = cv2.getTickCount()
             # clocks += toc - tic    # 總共有多少個 clocks (clock cycles)
@@ -161,14 +147,12 @@ def evaluate(test_loader, tracker):
             end = time.time()
             period += end - start
 
-            pred_scores.append(outputs['top_scores'])
-            pred_boxes.append(outputs['pred_boxes'])
-            label_boxes.append(gt_boxes.tolist())
+            all_pred_boxes.append(outputs['pred_boxes'])
+            all_gt_boxes.append(gt_boxes.tolist())
 
+            # precision, recall = calculate_metrics([outputs['pred_boxes']], [gt_boxes.tolist()])
             # ipdb.set_trace()
-
-            # precision, recall = calculate_metrics([outputs['top_scores']], [outputs['pred_boxes']], [gt_boxes.tolist()])
-        precision, recall = calculate_metrics(pred_scores, pred_boxes, label_boxes)
+        precision, recall = calculate_metrics(all_pred_boxes, all_gt_boxes)
         precision = precision * 100
         recall = recall * 100
 
@@ -187,6 +171,17 @@ def evaluate(test_loader, tracker):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='siamcar tracking')
+    parser.add_argument('--model', type=str, default='', help='model to eval')
+    parser.add_argument('--dataset_name', type=str, default='', help='dataset name')
+    parser.add_argument('--dataset', type=str, default='', help='training dataset')
+    parser.add_argument('--test_dataset', type=str, default='', help='testing dataset')
+    parser.add_argument('--criteria', type=str, default='', help='criteria of dataset')
+    parser.add_argument('--neg', type=float, default=0.0, help='negative pair')
+    parser.add_argument('--bg', type=str, help='background of template')
+    parser.add_argument('--cfg', type=str, default='./experiments/siamcar_r50/config_amy.yaml', help='configuration of tracking')
+    args = parser.parse_args()
+
     cfg.merge_from_file(args.cfg)  # 不加 ModelBuilder() 會出問題ㄟ ??
 
     print("Building dataset...")
@@ -205,7 +200,6 @@ if __name__ == "__main__":
     model = ModelBuilder()
     # Load model
     model = load_pretrain(model, args.model).cuda().eval()
-
     # Build tracker
     tracker = SiamCARTracker(model, cfg.TRACK)
 

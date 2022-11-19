@@ -1,6 +1,7 @@
+import math
+
 import torch
 from torch import nn
-import math
 
 
 class CARHead(torch.nn.Module):
@@ -64,6 +65,7 @@ class CARHead(torch.nn.Module):
                     torch.nn.init.constant_(l.bias, 0)
 
         # initialize the bias for focal loss
+        # Ref: https://leimao.github.io/blog/Focal-Loss-Explained/
         prior_prob = cfg.TRAIN.PRIOR_PROB
         bias_value = -math.log((1 - prior_prob) / prior_prob)
         torch.nn.init.constant_(self.cls_logits.bias, bias_value)

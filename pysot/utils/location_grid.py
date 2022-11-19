@@ -21,7 +21,8 @@ def compute_locations_per_level(h, w, stride, device, x_img_h, x_img_w):
         dtype=torch.float32, device=device
     )
     grids_y, grids_x = torch.meshgrid((grids_y, grids_x))
-    # width & height has there own shift value
+    # width & height has their own shift value
+    # 位移 = (原圖大小 - (score大小-1)*8) // 2
     shift_x = (x_img_w - (w - 1) * 8) // 2  # x 軸的起始點
     shift_y = (x_img_h - (h - 1) * 8) // 2  # y 軸的起始點
     grids_x = grids_x.reshape(-1) + shift_x

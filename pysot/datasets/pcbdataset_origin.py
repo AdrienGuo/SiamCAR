@@ -49,8 +49,6 @@ class PCBDataset(Dataset):
             self.dataset_dir = args.test_dataset
         else:
             self.dataset_dir = args.dataset
-        # self.anno = args.dataset
-        # self.loader = loader
         images, templates, searches = self._make_dataset(self.dataset_dir)
         images, templates, searches = self._filter_dataset(images, templates, searches, args.criteria)
 
@@ -59,7 +57,7 @@ class PCBDataset(Dataset):
         self.searches = searches
 
         # zf_size_min: smallest z size after res50 backbone
-        zf_size_min = 5
+        zf_size_min = 2
         # PCBCrop: Crop template & search (preprocess)
         self.pcb_crop = PCBCrop(zf_size_min)
 
@@ -216,9 +214,6 @@ class PCBDataset(Dataset):
         assert template[0] == search[0], f"ERROR, should be the same if neg is False"
         img_path = template[0]
         img_name = img_path.split('/')[-1].rsplit('.', 1)[0]
-        # origin_img = cv2.imread(img_path)
-        # template_image = cv2.imread(img_path)
-        # search_image = cv2.imread(img_path)
         img = cv2.imread(img_path)
         assert img is not None, f"Error image: {template[0]}"
         z_img = img
@@ -304,13 +299,12 @@ class PCBDataset(Dataset):
         x_img = torch.as_tensor(x_img, dtype=torch.float32)
 
         # 小於 15 的卷積後會變成 0
-        assert z_img.size(1) > 15, f"ERROR, should > 15, but got {z_img.size(1)}"
-        assert z_img.size(2) > 15, f"ERROR, should > 15, but got {z_img.size(2)}"
+        assert z_img.size(1) >= 15, f"ERROR, should > 15, but got {z_img.size(1)}"
+        assert z_img.size(2) >= 15, f"ERROR, should > 15, but got {z_img.size(2)}"
 
         # cls: (size, size) 都是 0
         # box: (n, 5: [0, x1, y1, x2, y2])
         # z_box: Corner(x1, y1, x2, y2)
-
         return img_name, img_path, z_img, x_img, cls, gt_boxes, z_box, r
 
         return {

@@ -1,11 +1,10 @@
 # Copyright (c) SenseTime. All Rights Reserved.
 # depthwise 從7x7改15x15
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from __future__ import unicode_literals
+from __future__ import (absolute_import, division, print_function,
+                        unicode_literals)
 
+import ipdb
 import torch.nn as nn
 
 

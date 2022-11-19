@@ -15,8 +15,8 @@ class PCBCrop:
         self.z_size = template_size
         self.x_size = search_size
 
-    def _template_crop(self, img, box):
-        img, scale = crop_like_SiamFC(img, box)
+    def _template_crop(self, img, box, padding=(0, 0, 0)):
+        img, scale = crop_like_SiamFC(img, box, padding=padding)
         assert abs(scale[0] - scale[1]) < 0.001, f"(scale[0]: {scale[0]} & scale[1]: {scale[1]}) should be the same"
 
         return img, scale
@@ -45,27 +45,20 @@ class PCBCrop:
 
         return x_img, gt_boxes, z_box, r, spatium
 
-    def get_template(self, img, box):
-        box = center2corner(box)
-        box = ratio2real(img, box)
+    def get_template(self, img, box, padding=(0, 0, 0)):
         box = box.squeeze()
-
-        img, z_scale = self._template_crop(img, box)
+        img, z_scale = self._template_crop(img, box, padding=padding)
         self.z_scale = z_scale    # 拿來調整 search 的大小
 
         return img
 
-    def get_search(self, img, gt_boxes, z_box):
-        gt_boxes = center2corner(gt_boxes)
-        gt_boxes = ratio2real(img, gt_boxes)
-        z_box = center2corner(z_box)
-        z_box = ratio2real(img, z_box)
-
+    def get_search(self, img, gt_boxes, z_box, padding=(0, 0, 0)):
         img, gt_boxes, z_box, r, spatium = self._search_crop(
             img,
             gt_boxes,
             z_box,
-            scale=self.z_scale
+            scale=self.z_scale,
+            padding=padding
         )
 
         # z_box: k-means 也會用到

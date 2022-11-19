@@ -150,6 +150,7 @@ class PCBDataset(Dataset):
                                 box = []
                                 for j in range(len(anno)):
                                     if anno[j][0] == anno[i][0]:
+                                        # anno[i] 的話就都是只有一個
                                         cx = float(anno[i][1]) + (float(anno[i][3]) - float(anno[i][1])) / 2
                                         cy = float(anno[i][2]) + (float(anno[i][4]) - float(anno[i][2])) / 2
                                         w = float(anno[i][3]) - float(anno[i][1])
@@ -360,8 +361,6 @@ class PCBDataset(Dataset):
 
         # img_cls = template[2]
         # assert isinstance(img_cls, str), f"Error, class should be string"
-        # if template_image is None:
-        #     print('error image:',template[0])
 
         ##########################################
         # Crop the template & search image.
@@ -521,7 +520,6 @@ class PCBDataset(Dataset):
         # cls: (size, size) 都是 0
         # box: (n, 5: [0, x1, y1, x2, y2])
         # z_box: Corner(x1, y1, x2, y2)
-
         return img_name, img_path, z_img, x_img, cls, gt_boxes, z_box, r
 
         return {

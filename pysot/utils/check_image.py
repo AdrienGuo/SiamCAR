@@ -6,6 +6,7 @@ import re
 
 import cv2
 import ipdb
+import matplotlib.pyplot as plt
 import numpy as np
 
 
@@ -94,3 +95,28 @@ def draw_preds(search_image, scores, annotation_path, idx):
     pred_image = draw_box(search_image, preds, type="pred", scores=scores)
 
     return pred_image
+
+
+# Ref: https://medium.com/%E6%89%8B%E5%AF%AB%E7%AD%86%E8%A8%98/grad-cam-introduction-d0e48eb64adb
+def draw_heatmap(img, cls, alpha=0.9):
+    assert len(img.shape) == 3, "ERROR, img is wrong!!"
+    img_h, img_w = img.shape[:2]
+
+    # Convert bgr to rgb
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    img = np.uint8(img)
+
+    # Resize heatmap as image
+    cls = cv2.resize(cls, (img_w, img_h))
+
+    # Display
+    # plt will cause memory leak if not clear it.
+    fig, ax = plt.subplots(num=1, clear=True)
+    # Add text (probability info)
+    ax.text(150, -10, f"Max: {str(np.around(cls.max(), 3))}", fontsize=12)
+    plt.imshow(img, alpha=alpha)
+    # Set the colorbar range (vmin, vmax)
+    plt.imshow(cls, alpha=0.2, cmap="jet", vmin=0.0, vmax=1.0)
+    plt.colorbar()
+
+    return plt

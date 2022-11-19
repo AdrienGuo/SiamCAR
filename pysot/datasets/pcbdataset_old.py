@@ -20,7 +20,7 @@ from pysot.core.config import cfg
 from pysot.datasets.augmentation import Augmentation
 from pysot.datasets.image_crop import crop, resize
 from pysot.datasets.pcb_crop_old import PCBCrop
-from pysot.utils.bbox import Center, center2corner
+from pysot.utils.bbox import Center, center2corner, ratio2real
 from pysot.utils.check_image import create_dir, draw_box, save_image
 from torch.utils.data import Dataset
 from torchvision import transforms
@@ -36,23 +36,28 @@ if pyv[0] == '3':
 
     
 class PCBDataset(Dataset): #先讀所有圖片，再以類別去讀anno
-    def __init__(self, args, loader=default_loader):
-        # for name in cfg.DATASET.NAMES:
-        #     data_cfg = getattr(cfg.DATASET, name)
-
+    def __init__(self, args, mode: str, loader=default_loader):
         self.args = args
-        self.root = args.test_dataset
-        self.anno = args.test_dataset
-        self.loader = loader
-        imgs,frame,temp = self._make_dataset(self.root)
+        self.mode = mode
+
+        z_size = cfg.TRAIN.EXEMPLAR_SIZE
+        x_size = cfg.TRAIN.SEARCH_SIZE
+        if mode == "test":
+            z_size = cfg.TRACK.EXEMPLAR_SIZE
+            x_size = cfg.TRACK.INSTANCE_SIZE
+            dataset_dir = args.test_dataset
+        else:
+            dataset_dir = args.dataset
+
+        imgs, frame, temp = self._make_dataset(dataset_dir)
         self.imgs = imgs
         self.frame = frame
         self.temp = temp
 
         # crop template & search (preprocess)
         self.pcb_crop = PCBCrop(
-            template_size=cfg.TRAIN.EXEMPLAR_SIZE,
-            search_size=cfg.TRAIN.SEARCH_SIZE,
+            template_size=z_size,
+            search_size=x_size,
         )
 
         self.loder = default_loader
@@ -81,18 +86,17 @@ class PCBDataset(Dataset): #先讀所有圖片，再以類別去讀anno
         return classes, class_to_idx
     
     def _make_dataset(self, directory):
-        imgs=[]
-        frame=[]
-        temp =[]
+        imgs = []
+        frame = []
+        temp = []
 
         directory = os.path.expanduser(directory)
-        
         for root, _, fnames in sorted(os.walk(directory, followlinks=True)):
-            for fname in sorted(fnames):#已排序
-                box=[]
-                if fname.endswith(('.jpg','.png','bmp')):
+            for fname in sorted(fnames):
+                box = []
+                if fname.endswith(('.jpg', '.png', 'bmp')):
                     path = os.path.join(root, fname)
-                    anno_path = os.path.join(self.anno,fname[:-3]+"txt")
+                    anno_path = os.path.join(root, fname[:-3]+"txt")
                     if os.path.isfile(anno_path):
                         f = open(anno_path,'r')
                         lines = f.readlines()
@@ -116,8 +120,8 @@ class PCBDataset(Dataset): #先讀所有圖片，再以類別去讀anno
                                         box.append([anno[j][1],anno[j][2],anno[j][3],anno[j][4]])
                                 box = np.stack(box).astype(np.float32)
                                 frame.append(box)
-                    elif os.path.isfile(os.path.join(self.anno,fname[:-3]+"label")):
-                        f = open(os.path.join(self.anno,fname[:-3]+"label"),'r')
+                    elif os.path.isfile(os.path.join(root, fname[:-3]+"label")):
+                        f = open(os.path.join(root, fname[:-3]+"label"),'r')
                         img =  cv2.imread(path)
                         imh, imw = img.shape[:2]
                         lines = f.readlines()
@@ -137,14 +141,14 @@ class PCBDataset(Dataset): #先讀所有圖片，再以類別去讀anno
                                 h = float(anno[i][4])-float(anno[i][2])
                                 temp.append([cx/imw,cy/imh,w/imw,h/imh])
                                 box=[]
-                                #print(anno[i])
 
                                 for j in range(len(anno)):
                                     if anno[j][0] == anno[i][0]:
-                                        cx = float(anno[i][1])+(float(anno[i][3])-float(anno[i][1]))/2
-                                        cy = float(anno[i][2])+(float(anno[i][4])-float(anno[i][2]))/2
-                                        w = float(anno[i][3])-float(anno[i][1])
-                                        h = float(anno[i][4])-float(anno[i][2])
+                                        # anno[i] 的話就都是只有一個
+                                        cx = float(anno[j][1])+(float(anno[j][3])-float(anno[j][1]))/2
+                                        cy = float(anno[j][2])+(float(anno[j][4])-float(anno[j][2]))/2
+                                        w = float(anno[j][3])-float(anno[j][1])
+                                        h = float(anno[j][4])-float(anno[j][2])
 
                                         box.append([cx/imw,cy/imh,w/imw,h/imh])
                                 box = np.stack(box).astype(np.float32)
@@ -292,20 +296,15 @@ class PCBDataset(Dataset): #先讀所有圖片，再以類別去讀anno
         # get image
         assert template[0] == search[0], f"Error, should be the same if neg=False"
         img_path = template[0]
-        img_name = img_path.split('/')[-1].split('.')[0]
-        origin_img = cv2.imread(img_path)
-        template_image = cv2.imread(img_path)
-        search_image = cv2.imread(img_path)
-        assert template_image is not None, f"Error image: {template[0]}"
-
-        # TODO: 為了測試加的
-        template_image = cv2.cvtColor(template_image, cv2.COLOR_BGR2RGB)
-        search_image = cv2.cvtColor(search_image, cv2.COLOR_BGR2RGB)
+        img_name = img_path.split('/')[-1].rsplit('.', 1)[0]
+        img = cv2.imread(img_path)
+        assert img is not None, f"Error image: {template[0]}"
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        template_image = img
+        search_image = img
 
         img_cls = template[2]
         assert isinstance(img_cls, str), f"Error, class should be string"
-        # if template_image is None:
-        #     print('error image:',template[0])
 
         template_box = template[1]
 
@@ -315,21 +314,31 @@ class PCBDataset(Dataset): #先讀所有圖片，再以類別去讀anno
         # x: search
         ######################################
         # TODO: 改成我的寫法，希望沒問題🙏
-        z_box = template[1]
+        z_box = template[1].copy()
+        gt_boxes = search[1].copy()  # gt_boxes: (num, [cx, cy, w, y]) #ratio
+
         z_box = np.asarray(z_box)
-        z_box = z_box[np.newaxis, :]    # [cx, cy, w, h] -> (1, [cx, cy, w, h]) 轉成跟 gt_boxes 一樣是二維的
-        gt_boxes = search[1]    # gt_boxes: (num, [cx, cy, w, y]) #ratio
+        z_box = z_box[np.newaxis, :]  # [cx, cy, w, h] -> (1, [cx, cy, w, h]) 轉成跟 gt_boxes 一樣是二維的
         gt_boxes = np.asarray(gt_boxes)
+        # center -> corner & ratio -> real
+        gt_boxes = center2corner(gt_boxes)
+        gt_boxes = ratio2real(img, gt_boxes)
+        z_box = center2corner(z_box)
+        z_box = ratio2real(img, z_box)
 
         # 亭儀的舊方法是先做出 template，再去調整 search
         # z_box: (1, [x1, y1, x2, y2])
         # gt_boxes: (num, [x1, y1, x2, y2])
-        # TODO: 加上 padding 的顏色 [r, g, b]
-        z_img = self.pcb_crop.get_template(template_image, z_box.copy())    # array 真的要小心處理，因為他們的 address 都是一樣的
-        x_img, gt_boxes, z_box, r, spatium = self.pcb_crop.get_search(search_image, gt_boxes.copy(), z_box.copy())
+        channel_average = (0, 0, 0)
+        if self.mode == "test":
+            channel_average = np.mean(img, axis=(0, 1))  # 用這張影像的平均值當作 padding
+            channel_average = np.floor(channel_average)
+        z_img = self.pcb_crop.get_template(
+            template_image, z_box, padding=channel_average)  # array 真的要小心處理，因為他們的 address 都是一樣的
+        x_img, gt_boxes, z_box, r, spatium = self.pcb_crop.get_search(
+            search_image, gt_boxes, z_box, padding=channel_average)
 
         # ===========================================
-
         # === crop to 511 x(like SiamFC) ===
         # imh,imw = template_image.shape[:2]
         # if cfg.DATASET.Background:
@@ -403,7 +412,6 @@ class PCBDataset(Dataset): #先讀所有圖片，再以類別去讀anno
         # 創 directory
         ########################
         # dir = f"./image_check/x{cfg.TRAIN.SEARCH_SIZE}_bg{self.args.bg}"
-
         # sub_dir = os.path.join(dir, img_name)
         # create_dir(sub_dir)
 
@@ -423,7 +431,7 @@ class PCBDataset(Dataset): #先讀所有圖片，再以類別去讀anno
         # save_name = f"{img_name}__{img_cls}__{index}.jpg"
 
         # origin_path = os.path.join(origin_dir, save_name)
-        # save_image(origin_img, origin_path)
+        # save_image(img, origin_path)
         # template_path = os.path.join(template_dir, save_name)
         # save_image(z_img, template_path)
 

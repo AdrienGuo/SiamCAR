@@ -11,43 +11,35 @@ import sys
 
 import cv2
 import ipdb
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torchvision.transforms.functional as F
+from eval import calculate_metrics
 from PIL import Image
-from pysot.core.config import cfg
-from pysot.datasets.collate import collate_fn_new
-# new / tri / origin
-from pysot.datasets.pcbdataset_new import PCBDataset
-from pysot.models.model_builder import ModelBuilder
-# tracker 可以改
-from pysot.tracker.siamcar_tracker import SiamCARTracker
-from pysot.utils.bbox import get_axis_aligned_bbox
-from pysot.utils.check_image import (create_dir, draw_box, draw_preds,
-                                     save_image)
-from pysot.utils.model_load import load_pretrain
-from toolkit.datasets.testdata import ImageFolderWithSelect
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
-from eval import calculate_metrics
+from pysot.core.config import cfg
+from pysot.datasets.collate import collate_fn_new
+# new / tri / origin
+from pysot.datasets.pcbdataset_origin import PCBDataset
+from pysot.models.model_builder import ModelBuilder
+# tracker 可以改
+from pysot.tracker.siamcar_tracker import SiamCARTracker
+# from pysot.tracker.siamcar_tracker_amy import SiamCARTracker
+from pysot.utils.bbox import get_axis_aligned_bbox
+from pysot.utils.check_image import (create_dir, draw_box, draw_heatmap,
+                                     draw_preds, save_image)
+from pysot.utils.model_load import load_pretrain
+from toolkit.datasets.testdata import ImageFolderWithSelect
 
 sys.path.append('../')
-
-parser = argparse.ArgumentParser(description='siamcar tracking')
-parser.add_argument('--model', type=str, default='', help='model to eval')
-parser.add_argument('--dataset_name', type=str, default='', help='dataset name')
-parser.add_argument('--test_dataset', type=str, default='', help='testing dataset')
-parser.add_argument('--criteria', type=str, default='', help='criteria of dataset')
-parser.add_argument('--neg', type=float, default=0.0, help='negative pair')
-parser.add_argument('--bg', type=str, help='background of template')
-parser.add_argument('--cfg', type=str, default='./experiments/siamcar_r50/config.yaml', help='configuration of tracking')
-args = parser.parse_args()
 
 torch.set_num_threads(1)
 
 
-def create_img_dir(save_dir, img_name):
+def create_img_dir(save_dir, img_name) -> dict:
     sub_dir = os.path.join(save_dir, img_name)
     create_dir(sub_dir)
 
@@ -61,25 +53,43 @@ def create_img_dir(save_dir, img_name):
     create_dir(anno_dir)
     pred_dir = os.path.join(sub_dir, "pred")
     create_dir(pred_dir)
-    return origin_dir, z_dir, x_dir, anno_dir, pred_dir
+    heatmap_dir = os.path.join(sub_dir, "heatmap")
+    create_dir(heatmap_dir)
+
+    path_dir_map = dict()
+    path_dir_map['origin'] = origin_dir
+    path_dir_map['template'] = z_dir
+    path_dir_map['search'] = x_dir
+    path_dir_map['annotation'] = anno_dir
+    path_dir_map['pred'] = pred_dir
+    path_dir_map['heatmap'] = heatmap_dir
+
+    return path_dir_map
 
 
-def save_fail(img_name, img, z_img, x_img, pred_img, idx):
-    origin_dir, z_dir, x_dir, _, pred_dir = create_img_dir(fail_dir, img_name)
-    origin_path = os.path.join(origin_dir, f"{img_name}.jpg")
+def save_fail_img(img_name, img, z_img, x_img, pred_img, heatmap, idx):
+# def save_fail_img(img_name, img, z_img, x_img, pred_img, idx):
+    path_dir_map = create_img_dir(fail_dir, img_name)
+    origin_path = os.path.join(path_dir_map['origin'], f"{img_name}.jpg")
     save_image(img, origin_path)
-    z_path = os.path.join(z_dir, f"{idx}.jpg")
+    z_path = os.path.join(path_dir_map['template'], f"{idx}.jpg")
     save_image(z_img, z_path)
-    x_path = os.path.join(x_dir, f"{idx}.jpg")
+    x_path = os.path.join(path_dir_map['search'], f"{idx}.jpg")
     save_image(x_img, x_path)
-    pred_path = os.path.join(pred_dir, f"{idx}.jpg")
+    pred_path = os.path.join(path_dir_map['pred'], f"{idx}.jpg")
     save_image(pred_img, pred_path)
+    heatmap_path = os.path.join(path_dir_map['heatmap'], f"{idx}.jpg")
+    heatmap.savefig(heatmap_path)
+    print(f"Save heatmap to: {heatmap_path}")
 
 
-def test(tracker, test_loader):
+def test_and_eval(tracker, test_loader):
     # hp_search
     params = getattr(cfg.HP_SEARCH, "PCB")
     hp = {'lr': params[0], 'penalty_k': params[1], 'window_lr': params[2]}
+
+    all_pred_boxes = list()
+    all_gt_boxes = list()
 
     for idx, data in enumerate(test_loader):
         img_name = data['img_name'][0]
@@ -96,10 +106,10 @@ def test(tracker, test_loader):
         # 用 PatternMatch_test 資料集的時候不能加，
         # 因為 img_path 的路徑是 dir 不是 path
         img = cv2.imread(img_path)
-        # 應該不用轉成 rgb 吧？？
+        print(f"Load image from: {img_path}")
         # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-        origin_dir, z_dir, x_dir, anno_dir, pred_dir = create_img_dir(save_dir, img_name)
+        path_dir_map = create_img_dir(save_dir, img_name)
 
         ##########################################
         # Predict
@@ -120,41 +130,48 @@ def test(tracker, test_loader):
         ######################################
         with torch.no_grad():
             z_img = tracker.init(z_img, bbox=z_box)
+            # z_img = tracker.init(img, bbox=z_box, z_img=z_img)
 
         ######################################
         # Do tracking (predict)
         ######################################
         with torch.no_grad():
             outputs = tracker.track(x_img, hp)
+            # outputs = tracker.track(img, hp, x_img=x_img)
 
-        # ipdb.set_trace()
-
-        # === save img ===
-        origin_path = os.path.join(origin_dir, f"{img_name}.jpg")
+        # Save original image
+        origin_path = os.path.join(path_dir_map['origin'], f"{img_name}.jpg")
         save_image(img, origin_path)
 
-        # === save z_img ===
+        # Save z_img
         z_img = z_img.cpu().numpy().squeeze()
-        z_img = np.transpose(z_img, (1, 2, 0))        # (3, 127, 127) -> (127, 127, 3)
-        z_path = os.path.join(z_dir, f"{idx}.jpg")
+        z_img = np.transpose(z_img, (1, 2, 0))  # (3, 127, 127) -> (127, 127, 3)
+        z_path = os.path.join(path_dir_map['template'], f"{idx}.jpg")
         save_image(z_img, z_path)
 
-        # === save x_img ===
+        # Save x_img
         x_img = outputs['x_img']
         x_img = x_img.cpu().numpy().squeeze()
         x_img = np.transpose(x_img, (1, 2, 0))
-        x_path = os.path.join(x_dir, f"{idx}.jpg")
+        x_path = os.path.join(path_dir_map['search'], f"{idx}.jpg")
         save_image(x_img, x_path)
+
+        # Save heatmap
+        cls = outputs['cls']
+        heatmap = draw_heatmap(x_img, cls)
+        heatmap_path = os.path.join(path_dir_map['heatmap'], f"{idx}.jpg")
+        heatmap.savefig(heatmap_path)
+        print(f"Save heatmap to: {heatmap_path}")
 
         # pred_scores on x_img
         scores = np.around(outputs['top_scores'], decimals=2)
-        # === pred_boxes on x_img ===
+        # pred_boxes on x_img
         for box in outputs['pred_boxes']:
             box = np.around(box, decimals=2)
             pred_boxes.append(box)
 
-        # === Save annotation on x_img ===
-        anno_path = os.path.join(anno_dir, f"{idx}.txt")
+        # Save annotation on x_img
+        anno_path = os.path.join(path_dir_map['annotation'], f"{idx}.txt")
         with open(anno_path, 'w') as f:
             # template
             f.write(', '.join(map(str, pred_boxes[0])) + '\n')
@@ -173,19 +190,29 @@ def test(tracker, test_loader):
         pred_img = draw_preds(pred_img, scores, anno_path, idx)
         if pred_img is None:  # 如果沒偵測到物件，存 x_img
             pred_img = x_img
-        pred_path = os.path.join(pred_dir, f"{idx}.jpg")
+        pred_path = os.path.join(path_dir_map['pred'], f"{idx}.jpg")
         save_image(pred_img, pred_path)
 
-        ##########################################
-        # Save fail pred image
-        ##########################################
-        precision, recall = calculate_metrics(
-            [outputs['top_scores']], [outputs['pred_boxes']], [gt_boxes.tolist()]
-        )
+        # ##########################################
+        # # Save fail pred image
+        # ##########################################
+        precision, recall = calculate_metrics([outputs['pred_boxes']], [gt_boxes.tolist()])
         if precision != 1 or recall != 1:
-            save_fail(img_name, img, z_img, x_img, pred_img, idx)
+            save_fail_img(img_name, img, z_img, x_img, pred_img, heatmap, idx)
+            # save_fail_img(img_name, img, z_img, x_img, pred_img, idx)
+
+        # For evaluating
+        all_pred_boxes.append(outputs['pred_boxes'])
+        all_gt_boxes.append(gt_boxes.tolist())
 
         # ipdb.set_trace()
+
+    precision, recall = calculate_metrics(all_pred_boxes, all_gt_boxes)
+    precision = precision * 100
+    recall = recall * 100
+
+    print(f"Precision: {precision}")
+    print(f"Recall: {recall}")
 
 
 def main():
@@ -194,7 +221,8 @@ def main():
 
     model = ModelBuilder()
     # load model
-    model = load_pretrain(model, args.model).cuda().eval()
+    # model = load_pretrain(model, args.model).cuda().eval()
+    model = load_pretrain(model, args.model).cuda().train()
     # build tracker
     tracker = SiamCARTracker(model, cfg.TRACK)
 
@@ -211,17 +239,28 @@ def main():
         collate_fn=collate_fn_new
     )
 
-    model_name = args.model.split('/')[-2]
-    print("Model:", model_name)
-
-    test(tracker, test_loader)
+    test_and_eval(tracker, test_loader)
 
 
 if __name__ == '__main__':
-    model_name = args.model.split('/')[-2]
-    print(f"Model: {model_name}")
+    parser = argparse.ArgumentParser(description='siamcar tracking')
+    parser.add_argument('--model', type=str, default='', help='model to eval')
+    parser.add_argument('--dataset_name', type=str, default='', help='dataset name')
+    parser.add_argument('--part', type=str, default='', help='train / test')
+    parser.add_argument('--test_dataset', type=str, default='', help='testing dataset')
+    parser.add_argument('--criteria', type=str, default='', help='criteria of dataset')
+    parser.add_argument('--neg', type=float, default=0.0, help='negative pair')
+    parser.add_argument('--bg', type=str, help='background of template')
+    parser.add_argument('--cfg', type=str, default='./experiments/siamcar_r50/config.yaml', help='configuration of tracking')
+    args = parser.parse_args()
 
-    save_dir = os.path.join("./results", args.dataset_name, args.criteria, model_name)
+    print(f"Load model from: {args.model}")
+    model_dir = args.model.split('/')[-2]
+    model_epoch = args.model.split('/')[-1].rsplit('.', 1)[0]
+    model_name = model_dir + '_' + model_epoch
+    print(f"Model name: {model_name}")
+
+    save_dir = os.path.join("./results", args.part, args.dataset_name, args.criteria, model_name)
     create_dir(save_dir)
     print(f"Test results saved to: {save_dir}")
 
