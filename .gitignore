@@ -16,6 +16,8 @@ train_dataset/
 results_amy/
 .vscode/
 
+# file
+.fuse_hidden*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

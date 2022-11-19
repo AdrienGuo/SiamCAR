@@ -78,6 +78,7 @@ def crop_like_teacher(img, box, bg, exemplar_size=127, padding=(0, 0, 0)):
                box_pos[1] + crop_h * 0.5]
 
         # 不要讓裁切範圍超出原圖
+        # TODO: int -> np.around
         box[0] = int(max(0, box[0]))
         box[1] = int(max(0, box[1]))
         box[2] = int(min(img_w, box[2]))
@@ -138,10 +139,15 @@ def crop_origin(img, box, bg):
            box_pos[1] + crop_h * 0.5]
 
     # 不要讓裁切範圍超出原圖
-    box[0] = int(max(0, box[0]))
-    box[1] = int(max(0, box[1]))
-    box[2] = int(min(img_w, box[2]))
-    box[3] = int(min(img_h, box[3]))
+    # box[0] = int(max(0, box[0]))
+    # box[1] = int(max(0, box[1]))
+    # box[2] = int(min(img_w, box[2]))
+    # box[3] = int(min(img_h, box[3]))
+    # TODO: 雖然這樣才是正確的，但改成這樣好像效果會變差一點
+    box[0] = int(np.round(max(0, box[0])))
+    box[1] = int(np.round(max(0, box[1])))
+    box[2] = int(np.round(min(img_w, box[2])))
+    box[3] = int(np.round(min(img_h, box[3])))
 
     crop_img = img[box[1]: box[3], box[0]: box[2]]
 

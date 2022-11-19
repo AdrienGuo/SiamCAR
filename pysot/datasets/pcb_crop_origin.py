@@ -14,12 +14,12 @@ from pysot.datasets.process import resize, translate
 class PCBCrop:
     """ This class is used for ORIGIN dataset.
     """
-    def __init__(self, zf_size_min) -> None:
+    def __init__(self, zf_size_min):
         """
         Args:
             zf_size_min: smallest z size after res50 backbone
         """
-        # 公式從 zf 轉換回 z_img 最小的 size
+        # 公式: 從 zf 轉換回 z_img 最小的 size
         z_img_size_min = (((((zf_size_min - 1) * 2) + 2) * 2) * 2 + 7)
         self.z_min = z_img_size_min
 

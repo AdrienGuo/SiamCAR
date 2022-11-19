@@ -1,11 +1,11 @@
 # Copyright (c) SenseTime. All Rights Reserved.
-
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
 import argparse
 import math
 import os
+import re
 import shutil
 import sys
 
@@ -254,10 +254,12 @@ if __name__ == '__main__':
     parser.add_argument('--cfg', type=str, default='./experiments/siamcar_r50/config.yaml', help='configuration of tracking')
     args = parser.parse_args()
 
+    # TODO: 應該要先 load model 才能創資料夾
     print(f"Load model from: {args.model}")
     model_dir = args.model.split('/')[-2]
     model_epoch = args.model.split('/')[-1].rsplit('.', 1)[0]
     model_name = model_dir + '_' + model_epoch
+    model_name = re.sub("_model", "", model_name)
     print(f"Model name: {model_name}")
 
     save_dir = os.path.join("./results", args.part, args.dataset_name, args.criteria, model_name)

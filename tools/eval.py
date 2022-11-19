@@ -20,7 +20,6 @@ from pysot.datasets.collate import collate_fn_new
 from pysot.datasets.pcbdataset_origin import PCBDataset
 from pysot.models.model_builder import ModelBuilder
 from pysot.tracker.siamcar_tracker import SiamCARTracker
-# from pysot.tracker.siamcar_tracker_amy import SiamCARTracker
 from pysot.utils.bbox import get_axis_aligned_bbox
 from pysot.utils.check_image import draw_preds, save_image
 from pysot.utils.model_load import load_pretrain
@@ -28,6 +27,7 @@ from toolkit.statistics import overlap_ratio_one
 # from toolkit.datasets import DatasetFactory
 from torch.utils.data import DataLoader, Subset
 from torchvision import transforms
+from torch.cuda.amp import autocast
 
 torch.set_num_threads(1)
 
@@ -123,6 +123,8 @@ def evaluate(test_loader, tracker):
             gt_boxes[:, 2] = gt_boxes[:, 2] - gt_boxes[:, 0]
             gt_boxes[:, 3] = gt_boxes[:, 3] - gt_boxes[:, 1]
 
+            ipdb.set_trace()
+
             ######################################
             # Init tracker
             ######################################
@@ -130,7 +132,7 @@ def evaluate(test_loader, tracker):
             start = time.time()
 
             # 用 template image 將 tracker 初始化
-            # z_crop = tracker.init(image, gt_box)
+            # with autocast():
             _ = tracker.init(z_img, z_box)
             # _ = tracker.init(img, z_box)
 
@@ -138,6 +140,7 @@ def evaluate(test_loader, tracker):
             # Do tracking (predict)
             ######################################
             # 用 search image 進行 "track" 的動作
+            # with autocast():
             outputs = tracker.track(x_img, hp)
             # outputs = tracker.track(img, hp)
 
@@ -179,10 +182,19 @@ if __name__ == "__main__":
     parser.add_argument('--criteria', type=str, default='', help='criteria of dataset')
     parser.add_argument('--neg', type=float, default=0.0, help='negative pair')
     parser.add_argument('--bg', type=str, help='background of template')
-    parser.add_argument('--cfg', type=str, default='./experiments/siamcar_r50/config_amy.yaml', help='configuration of tracking')
+    parser.add_argument('--cfg', type=str, default='./experiments/siamcar_r50/config.yaml', help='configuration of tracking')
     args = parser.parse_args()
 
     cfg.merge_from_file(args.cfg)  # 不加 ModelBuilder() 會出問題ㄟ ??
+
+    # Create model
+    print(f"Loading model...")
+    model = ModelBuilder()
+    # Load model
+    # model = load_pretrain(model, args.model).cuda().eval()
+    model = load_pretrain(model, args.model).cuda().train()
+    # Build tracker
+    tracker = SiamCARTracker(model, cfg.TRACK)
 
     print("Building dataset...")
     test_dataset = PCBDataset(args, "test")
@@ -195,13 +207,6 @@ if __name__ == "__main__":
         num_workers=0,
         collate_fn=collate_fn_new
     )
-
-    # Create model
-    model = ModelBuilder()
-    # Load model
-    model = load_pretrain(model, args.model).cuda().eval()
-    # Build tracker
-    tracker = SiamCARTracker(model, cfg.TRACK)
 
     # evaluate(test_loader, tracker)
     print("Start evaluating...")

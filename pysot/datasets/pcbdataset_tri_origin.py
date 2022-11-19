@@ -14,7 +14,7 @@ import ipdb
 import numpy as np
 import torch
 from pysot.core.config import cfg
-from pysot.datasets.pcb_crop_tri import PCBCrop
+from pysot.datasets.pcb_crop_tri_origin import PCBCrop
 from pysot.utils.bbox import Center, Corner, center2corner
 from pysot.utils.check_image import create_dir, draw_box, save_image
 from torchvision import transforms
@@ -45,11 +45,11 @@ class PCBDataset():
         self.templates = templates
         self.searches = searches
 
-        # self.mode = mode
-        self.pcb_crop = PCBCrop(
-            template_size=cfg.TRACK.EXEMPLAR_SIZE,
-            search_size=cfg.TRACK.INSTANCE_SIZE,
-        )
+        # zf_size_min: smallest z size after res50 backbone
+        zf_size_min = 4
+        # PCBCrop: Crop template & search (preprocess)
+        self.pcb_crop = PCBCrop(zf_size_min)
+
 
     def _make_dataset(self, dir_path):
         """
@@ -139,16 +139,16 @@ class PCBDataset():
 
         # Create virtual boxes
         z_box = np.array([[0, 0, z_img.shape[1], z_img.shape[0]]])
-        gt_boxes = np.array([[0, 0, 0, 0]])    # useless
+        gt_boxes = np.array([[0, 0, 0, 0]])  # useless
 
         ##########################################
         # Step 2.
         # Crop the template and search images
         ##########################################
-        # 先將原本的 search image 做 r 的縮放，
-        # 再對 template 做相同 r 的縮放，z_box 是為了做 ratio_penalty
-        x_img, r = self.pcb_crop.get_search(x_img, gt_boxes)
-        z_img, z_box = self.pcb_crop.get_template(z_img, z_box, r)
+        # 確保 z_img 的最小邊不會小於 threshold，
+        # 若是 z_img 有做縮放 -> x_img 一樣要做縮放
+        z_img, z_box, r = self.pcb_crop.get_template(z_img, z_box)
+        x_img = self.pcb_crop.get_search(x_img, gt_boxes, r)
 
         # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
         ########################

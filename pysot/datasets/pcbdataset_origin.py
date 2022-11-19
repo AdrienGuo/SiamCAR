@@ -57,7 +57,7 @@ class PCBDataset(Dataset):
         self.searches = searches
 
         # zf_size_min: smallest z size after res50 backbone
-        zf_size_min = 2
+        zf_size_min = 4
         # PCBCrop: Crop template & search (preprocess)
         self.pcb_crop = PCBCrop(zf_size_min)
 
@@ -248,7 +248,7 @@ class PCBDataset(Dataset):
         ########################
         # 創 directory
         ########################
-        # dir = f"./image_check/x{cfg.TRAIN.SEARCH_SIZE}_bg{self.args.bg}"
+        # dir = f"./image_check/origin/x{cfg.TRAIN.SEARCH_SIZE}_bg{self.args.bg}"
         # sub_dir = os.path.join(dir, img_name)
         # create_dir(sub_dir)
 

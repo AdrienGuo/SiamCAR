@@ -2,21 +2,23 @@
 
 # Model Info
 train_dataset="all"
-criteria="big"
+train_criteria="big"
 neg=(0.0)
 size=(255)
 bg="1.0"
 epoch=(1000)
 batch=(1)
-n_epoch=(450)
+n_epoch=(300)
 
 # Test Info
 part="test"
 test_dataset="all"
+criteria="big"
 
 
-save_models="./save_models/${train_dataset}/${criteria}"
-model_dir="${train_dataset}_${criteria}_neg${neg}_x${size}_bg${bg}_e${epoch}_b${batch}"
+# Model path
+save_models="./save_models/${train_dataset}/${train_criteria}"
+model_dir="${train_dataset}_${train_criteria}_neg${neg}_x${size}_bg${bg}_e${epoch}_b${batch}"
 n_model="model_e${n_epoch}.pth"
 model="${save_models}/${model_dir}/${n_model}"
 # official_model="./snapshot/official/model_general.pth"
