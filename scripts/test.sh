@@ -11,7 +11,7 @@ batch=(1)
 n_epoch=(300)
 
 # Test Info
-part="test"
+part="train"
 test_dataset="all"
 criteria="big"
 

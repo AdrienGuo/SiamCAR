@@ -132,16 +132,16 @@ def evaluate(test_loader, tracker):
             start = time.time()
 
             # 用 template image 將 tracker 初始化
-            # with autocast():
-            _ = tracker.init(z_img, z_box)
+            with autocast():
+                _ = tracker.init(z_img, z_box)
             # _ = tracker.init(img, z_box)
 
             ######################################
             # Do tracking (predict)
             ######################################
             # 用 search image 進行 "track" 的動作
-            # with autocast():
-            outputs = tracker.track(x_img, hp)
+            with autocast():
+                outputs = tracker.track(x_img, hp)
             # outputs = tracker.track(img, hp)
 
             # toc = cv2.getTickCount()
@@ -207,6 +207,13 @@ if __name__ == "__main__":
         num_workers=0,
         collate_fn=collate_fn_new
     )
+
+    # Create model
+    model = ModelBuilder()
+    # Load model
+    model = load_pretrain(model, args.model).cuda().train()
+    # Build tracker
+    tracker = SiamCARTracker(model, cfg.TRACK)
 
     # evaluate(test_loader, tracker)
     print("Start evaluating...")

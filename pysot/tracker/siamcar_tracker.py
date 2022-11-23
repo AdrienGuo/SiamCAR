@@ -23,7 +23,7 @@ class SiamCARTracker(SiameseTracker):
         hanning = np.hanning(cfg.SCORE_SIZE)
         self.window = np.outer(hanning, hanning)
         self.model = model
-        # 一定要特別標起來紀念一下 (11/08/2022)
+        # 一定要特別標起來紀念一下 (11/18/2022)
         # self.model.eval()
 
     def _convert_cls(self, cls):
@@ -168,11 +168,13 @@ class SiamCARTracker(SiameseTracker):
             # 再去調整原本預測出來的 ave_w, ave_h，
             # 如果 cls_up 的分數越高 --> lr 就越高，
             # lr 越高 --> 新的 w, h 會越近原本預測的 ave_w, ave_h
+            # TODO: 我現在是把這個功能取消，因為我的 gt 跟 template 的大小和長寬比都可能會差很多
             lr = cls_up[max_r_up, max_c_up] * hp['lr'] * penalty
             new_width = lr * ave_w + (1 - lr) * self.size[0]
             new_height = lr * ave_h + (1 - lr) * self.size[1]
 
-            box = [new_cx, new_cy, new_width, new_height]
+            # box = [new_cx, new_cy, new_width, new_height]
+            box = [new_cx, new_cy, ave_w, ave_h]
             boxes.append(box)
 
             score[max_r_up][max_c_up] = -1

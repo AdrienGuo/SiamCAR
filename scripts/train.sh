@@ -1,9 +1,9 @@
 # bin/bash
 
-dataset="all"
-criteria="mid"
+dataset="tmp"
+criteria="big"
 neg=(0.0)
-bg="1.3"
+bg="1.0"
 epoch=(1000)
 batch_size=(1)
 accum_iter=(1)

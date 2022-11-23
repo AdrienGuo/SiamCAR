@@ -75,6 +75,7 @@ class ModelBuilder(nn.Module):
         cls = F.log_softmax(cls, dim=4)
         return cls
 
+    # TODO: @autucast()
     def forward(self, data):
         """ only used in training
         """
@@ -82,6 +83,9 @@ class ModelBuilder(nn.Module):
         x_img = data['x_img'].cuda()
         gt_cls = data['gt_cls'].cuda()
         gt_boxes = data['gt_boxes'].cuda()  # (?, [x1, y1, x2, y2])
+
+        # print(f"Load image from: {data['img_path']}")
+        # print(f"z_box is: {data['z_box']}")
 
         # backbone (ResNet50)
         zf = self.backbone(z_img)
