@@ -223,6 +223,7 @@ class BasicBlock(nn.Module):
         self.conv1 = nn.Conv2d(inplanes, planes,
                                stride=stride, dilation=dd, bias=False,
                                kernel_size=3, padding=pad)
+        # TODO: track_running_stats=False
         self.bn1 = nn.BatchNorm2d(planes)
         self.relu = nn.ReLU(inplace=True)
         self.conv2 = conv3x3(planes, planes, dilation=dilation)

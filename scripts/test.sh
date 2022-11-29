@@ -3,24 +3,26 @@
 # Model Info
 train_dataset="all"
 train_criteria="big"
+train_method="origin"
 neg=(0.0)
 size=(255)
 bg="1.0"
 epoch=(1000)
 batch=(1)
-n_epoch=(300)
+checkpoint=(300)
 
 # Test Info
-part="train"
+part="test"
 test_dataset="all"
 criteria="big"
+method="tri_origin"
 
 
 # Model path
-save_models="./save_models/${train_dataset}/${train_criteria}"
+save_models="./save_models/${train_dataset}/${train_criteria}/${train_method}"
 model_dir="${train_dataset}_${train_criteria}_neg${neg}_x${size}_bg${bg}_e${epoch}_b${batch}"
-n_model="model_e${n_epoch}.pth"
-model="${save_models}/${model_dir}/${n_model}"
+checkpoint="model_e${checkpoint}.pth"
+model="${save_models}/${model_dir}/${checkpoint}"
 # official_model="./snapshot/official/model_general.pth"
 # amy_model="./snapshot/amy/checkpoint_e999.pth"
 # other_model="./snapshot/others/checkpoint_e199.pth"
@@ -28,7 +30,7 @@ model="${save_models}/${model_dir}/${n_model}"
 
 
 echo "=== Your Test Parameters ==="
-# echo "Model: ${model_dir} & ${n_epoch}th"
+echo "Model: ${model_dir} & ${checkpoint}th"
 echo "Test dataset: ${test_dataset}"
 echo "Criteria: ${criteria}"
 echo "Size: ${size}"
@@ -43,5 +45,6 @@ python3 \
     --part ${part} \
     --test_dataset ./datasets/${part}/${test_dataset} \
     --criteria ${criteria} \
+    --method ${method} \
     --neg ${neg} \
     --bg ${bg} \

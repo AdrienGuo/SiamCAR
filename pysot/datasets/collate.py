@@ -2,8 +2,9 @@ import ipdb
 import torch
 
 
-def collate_fn_new(batch):
-    img_name, img_path, z_img, x_img, cls, box, z_box, r = zip(*batch)
+def collate_fn(batch):
+    img_name, img_path, z_img, x_img, cls, box, z_box, r \
+        = zip(*batch)
 
     for i, l in enumerate(box):
         l[:, 0] = i  # add target image index for build_targets()

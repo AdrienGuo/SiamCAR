@@ -15,9 +15,9 @@ import torch
 import torchvision.transforms.functional as F
 from PIL import Image, ImageDraw, ImageFont
 from pysot.core.config import cfg
-from pysot.datasets.collate import collate_fn_new
-# 記得要改
-from pysot.datasets.pcbdataset_origin import PCBDataset
+from pysot.datasets.collate import collate_fn
+# from pysot.datasets.pcbdataset.pcbdataset_origin import PCBDatasetOrigin
+from pysot.datasets.pcbdataset import get_pcbdataset
 from pysot.models.model_builder import ModelBuilder
 from pysot.tracker.siamcar_tracker import SiamCARTracker
 from pysot.utils.bbox import get_axis_aligned_bbox
@@ -123,8 +123,6 @@ def evaluate(test_loader, tracker):
             gt_boxes[:, 2] = gt_boxes[:, 2] - gt_boxes[:, 0]
             gt_boxes[:, 3] = gt_boxes[:, 3] - gt_boxes[:, 1]
 
-            ipdb.set_trace()
-
             ######################################
             # Init tracker
             ######################################
@@ -180,6 +178,7 @@ if __name__ == "__main__":
     parser.add_argument('--dataset', type=str, default='', help='training dataset')
     parser.add_argument('--test_dataset', type=str, default='', help='testing dataset')
     parser.add_argument('--criteria', type=str, default='', help='criteria of dataset')
+    parser.add_argument('--method', type=str, default='', help='method for dataset')
     parser.add_argument('--neg', type=float, default=0.0, help='negative pair')
     parser.add_argument('--bg', type=str, help='background of template')
     parser.add_argument('--cfg', type=str, default='./experiments/siamcar_r50/config.yaml', help='configuration of tracking')
@@ -187,35 +186,25 @@ if __name__ == "__main__":
 
     cfg.merge_from_file(args.cfg)  # 不加 ModelBuilder() 會出問題ㄟ ??
 
-    # Create model
-    print(f"Loading model...")
+    # Load model & Build tracker
+    print(f"Loading model from: {args.model} ...")
     model = ModelBuilder()
-    # Load model
-    # model = load_pretrain(model, args.model).cuda().eval()
     model = load_pretrain(model, args.model).cuda().train()
-    # Build tracker
     tracker = SiamCARTracker(model, cfg.TRACK)
 
+    # Build dataset
     print("Building dataset...")
-    test_dataset = PCBDataset(args, "test")
-    print(f"Dataset size: {len(test_dataset)}")
-    assert len(test_dataset) != 0, "ERROR, empty dataset"
-
+    pcbdataset = get_pcbdataset(args.method)
+    dataset = pcbdataset(args, "test")
+    print(f"Dataset size: {len(dataset)}")
+    assert len(dataset) != 0, "ERROR, empty dataset"
     test_loader = DataLoader(
-        test_dataset,
+        dataset,
         batch_size=1,  # 只能設 1
-        num_workers=0,
-        collate_fn=collate_fn_new
+        num_workers=8,
+        collate_fn=collate_fn
     )
 
-    # Create model
-    model = ModelBuilder()
-    # Load model
-    model = load_pretrain(model, args.model).cuda().train()
-    # Build tracker
-    tracker = SiamCARTracker(model, cfg.TRACK)
-
-    # evaluate(test_loader, tracker)
     print("Start evaluating...")
     metrics = evaluate(test_loader, tracker)
 

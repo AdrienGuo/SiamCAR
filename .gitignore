@@ -15,6 +15,7 @@ save_models/
 train_dataset/
 results_amy/
 .vscode/
+wrong_labels/
 
 # file
 .fuse_hidden*

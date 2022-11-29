@@ -1,7 +1,8 @@
 # bin/bash
 
-dataset="tmp"
+dataset="all"
 criteria="big"
+method="origin"
 neg=(0.0)
 bg="1.0"
 epoch=(1000)
@@ -12,6 +13,7 @@ accum_iter=(1)
 echo "=== Your Training Parameters ==="
 echo "Dataset: ${dataset}"
 echo "Criteria: ${criteria}"
+echo "Method: ${method}"
 echo "Neg Ratio: ${neg}"
 echo "Background: ${bg}"
 echo "Epoch: ${epoch}"
@@ -29,6 +31,7 @@ python3 \
     --dataset ./datasets/train/${dataset} \
     --test_dataset ./datasets/test/${dataset} \
     --criteria ${criteria} \
+    --method ${method} \
     --neg ${neg} \
     --bg ${bg} \
     --epoch ${epoch} \

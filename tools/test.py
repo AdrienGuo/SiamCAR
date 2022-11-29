@@ -21,9 +21,10 @@ from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
 from pysot.core.config import cfg
-from pysot.datasets.collate import collate_fn_new
+from pysot.datasets.collate import collate_fn
 # new / tri / origin
-from pysot.datasets.pcbdataset_origin import PCBDataset
+# from pysot.datasets.pcbdataset.pcbdataset_origin import PCBDataset
+from pysot.datasets.pcbdataset import get_pcbdataset
 from pysot.models.model_builder import ModelBuilder
 # tracker 可以改
 from pysot.tracker.siamcar_tracker import SiamCARTracker
@@ -32,7 +33,6 @@ from pysot.utils.bbox import get_axis_aligned_bbox
 from pysot.utils.check_image import (create_dir, draw_box, draw_heatmap,
                                      draw_preds, save_image)
 from pysot.utils.model_load import load_pretrain
-from toolkit.datasets.testdata import ImageFolderWithSelect
 
 sys.path.append('../')
 
@@ -116,13 +116,13 @@ def test_and_eval(tracker, test_loader):
         pred_boxes = []
 
         # 調整 z_box, gt_boxes 的框框，tracker.init() 的格式需要
-        z_box[2] = z_box[2] - z_box[0]    # x2 -> w
-        z_box[3] = z_box[3] - z_box[1]    # y2 -> h
+        z_box[2] = z_box[2] - z_box[0]  # x2 -> w
+        z_box[3] = z_box[3] - z_box[1]  # y2 -> h
         pred_boxes.append(z_box)
 
         gt_boxes = gt_boxes.cpu().numpy()
-        gt_boxes[:, 2] = gt_boxes[:, 2] - gt_boxes[:, 0]    # x2 -> w
-        gt_boxes[:, 3] = gt_boxes[:, 3] - gt_boxes[:, 1]    # y2 -> h
+        gt_boxes[:, 2] = gt_boxes[:, 2] - gt_boxes[:, 0]  # x2 -> w
+        gt_boxes[:, 3] = gt_boxes[:, 3] - gt_boxes[:, 1]  # y2 -> h
 
         ######################################
         # Init tracker
@@ -214,33 +214,6 @@ def test_and_eval(tracker, test_loader):
     print(f"Recall: {recall}")
 
 
-def main():
-    # load config
-    cfg.merge_from_file(args.cfg)
-
-    model = ModelBuilder()
-    # load model
-    # model = load_pretrain(model, args.model).cuda().eval()
-    model = load_pretrain(model, args.model).cuda().train()
-    # build tracker
-    tracker = SiamCARTracker(model, cfg.TRACK)
-
-    # Create dataset
-    print("Building dataset...")
-    # dataset = ImageFolderWithSelect(args.test_dataset)
-    dataset = PCBDataset(args=args, mode="test")
-    assert len(dataset) != 0, "ERROR, dataset is empty!!"
-    print(f"Test dataset size: {len(dataset)}")
-
-    test_loader = DataLoader(
-        dataset,
-        batch_size=1,
-        collate_fn=collate_fn_new
-    )
-
-    test_and_eval(tracker, test_loader)
-
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='siamcar tracking')
     parser.add_argument('--model', type=str, default='', help='model to eval')
@@ -248,27 +221,48 @@ if __name__ == '__main__':
     parser.add_argument('--part', type=str, default='', help='train / test')
     parser.add_argument('--test_dataset', type=str, default='', help='testing dataset')
     parser.add_argument('--criteria', type=str, default='', help='criteria of dataset')
+    parser.add_argument('--method', type=str, default='', help='method for dataset')
     parser.add_argument('--neg', type=float, default=0.0, help='negative pair')
     parser.add_argument('--bg', type=str, help='background of template')
     parser.add_argument('--cfg', type=str, default='./experiments/siamcar_r50/config.yaml', help='configuration of tracking')
     args = parser.parse_args()
 
-    # TODO: 應該要先 load model 才能創資料夾
-    print(f"Load model from: {args.model}")
+    # Load config
+    cfg.merge_from_file(args.cfg)
+
+    # Load model & Build tracker
+    print(f"Loading model from: {args.model} ...")
+    model = ModelBuilder()
+    model = load_pretrain(model, args.model).cuda().train()
+    tracker = SiamCARTracker(model, cfg.TRACK)
+
+    # Build dataset
+    print("Building dataset...")
+    pcbdataset = get_pcbdataset(args.method)
+    dataset = pcbdataset(args, mode="test")
+    assert len(dataset) != 0, "ERROR, dataset is empty!!"
+    print(f"Test dataset size: {len(dataset)}")
+    test_loader = DataLoader(
+        dataset,
+        batch_size=1,
+        num_workers=8,
+        collate_fn=collate_fn
+    )
+
+    # Create dir to save results
     model_dir = args.model.split('/')[-2]
     model_epoch = args.model.split('/')[-1].rsplit('.', 1)[0]
     model_name = model_dir + '_' + model_epoch
-    model_name = re.sub("_model", "", model_name)
+    model_name = re.sub("_checkpoint", "", model_name)
     print(f"Model name: {model_name}")
-
-    save_dir = os.path.join("./results", args.part, args.dataset_name, args.criteria, model_name)
+    save_dir = os.path.join(
+        "./results", args.part, args.dataset_name, args.criteria, args.method, model_name)
     create_dir(save_dir)
     print(f"Test results saved to: {save_dir}")
-
     fail_dir = os.path.join(save_dir, "FAILED")
     create_dir(fail_dir)
     print(f"Failed results saved to: {fail_dir}")
 
-    main()
+    test_and_eval(tracker, test_loader)
 
     print('=' * 20, "DONE!", '=' * 20)

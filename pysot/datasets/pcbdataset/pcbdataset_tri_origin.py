@@ -14,7 +14,7 @@ import ipdb
 import numpy as np
 import torch
 from pysot.core.config import cfg
-from pysot.datasets.pcb_crop_tri_origin import PCBCrop
+from pysot.datasets.pcb_crop.pcb_crop_tri_origin import PCBCrop
 from pysot.utils.bbox import Center, Corner, center2corner
 from pysot.utils.check_image import create_dir, draw_box, save_image
 from torchvision import transforms
@@ -28,13 +28,13 @@ if pyv[0] == '3':
     cv2.ocl.setUseOpenCL(False)
 
 
-class PCBDataset():
+class PCBDatasetTriOrigin():
     """ 定義代號
         x: template
         z: search
     """
     def __init__(self, args, mode) -> None:
-        super(PCBDataset, self).__init__()
+        super(PCBDatasetTriOrigin, self).__init__()
 
         self.root = args.test_dataset
         images, templates, searches = self._make_dataset(self.root)

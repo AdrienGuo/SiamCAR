@@ -3,24 +3,25 @@
 # Model Info
 train_dataset="all"
 train_criteria="big"
-crop_method="origin"
+train_method="origin"
 neg=(0.0)
 size=(255)
 bg="1.0"
 epoch=(1000)
 batch=(1)
-n_epoch=(950)
+checkpoint=(950)
 
 # Eval Info
 part="train"
-test_dataset="all"
-criteria="big"
+test_dataset="tmp"
+criteria="all"
+method="tri_origin"
 
 
 # Model path
 save_models="./save_models/${train_dataset}/${train_criteria}"
-model_dir="${train_dataset}_${train_criteria}_${crop_method}_neg${neg}_x${size}_bg${bg}_e${epoch}_b${batch}"
-n_model="model_e${n_epoch}.pth"
+model_dir="${train_dataset}_${train_criteria}_${train_method}_neg${neg}_x${size}_bg${bg}_e${epoch}_b${batch}"
+n_model="model_e${checkpoint}.pth"
 model="${save_models}/${model_dir}/${n_model}"
 # official_model="./snapshot/official/model_general.pth"
 # amy_model="./snapshot/amy/checkpoint_e999.pth"
@@ -29,10 +30,10 @@ model="${save_models}/${model_dir}/${n_model}"
 
 
 echo "=== Your Eval Parameters ==="
-# echo "Model: ${model_dir} & ${n_epoch}th"
-echo "Method: ${crop_method}"
+# echo "Model: ${model_dir} & ${checkpoint}th"
 echo "Eval dataset: ${test_dataset}"
 echo "Criteria: ${criteria}"
+echo "Method: ${method}"
 echo "Size: ${size}"
 echo "Background: ${bg}"
 sleep 3
@@ -44,5 +45,6 @@ python3 \
     --dataset_name ${test_dataset} \
     --test_dataset ./datasets/${part}/${test_dataset} \
     --criteria ${criteria} \
+    --method ${method} \
     --neg ${neg} \
     --bg ${bg} \

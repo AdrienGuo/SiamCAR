@@ -84,14 +84,13 @@ class ModelBuilder(nn.Module):
         gt_cls = data['gt_cls'].cuda()
         gt_boxes = data['gt_boxes'].cuda()  # (?, [x1, y1, x2, y2])
 
-        # print(f"Load image from: {data['img_path']}")
-        # print(f"z_box is: {data['z_box']}")
-
         # backbone (ResNet50)
+        # 這樣應該就是使用同一個 backbone
         zf = self.backbone(z_img)
         xf = self.backbone(x_img)
 
         # neck
+        # 應該也是使用同一個 neck
         if cfg.ADJUST.ADJUST:
             zf = self.neck(zf)
             xf = self.neck(xf)
@@ -114,7 +113,8 @@ class ModelBuilder(nn.Module):
         cls = self.log_softmax(cls)
 
         # Calculate loss
-        cen_loss, cls_loss, loc_loss, cls_pos_loss, cls_neg_loss = self.loss_evaluator(
+        cen_loss, cls_loss, loc_loss, cls_pos_loss, cls_neg_loss \
+        = self.loss_evaluator(
             locations,
             cen,
             cls,
@@ -132,5 +132,4 @@ class ModelBuilder(nn.Module):
             cfg.TRAIN.LOC_WEIGHT * loc_loss + cfg.TRAIN.CEN_WEIGHT * cen_loss
         loss['cls_pos'] = cls_pos_loss
         loss['cls_neg'] = cls_neg_loss
-
         return loss

@@ -24,9 +24,10 @@ from torchvision import transforms
 
 import wandb
 from pysot.core.config import cfg
-from pysot.datasets.collate import collate_fn_new
+from pysot.datasets.collate import collate_fn
 # 選擇 new / origin 的裁切方式
-from pysot.datasets.pcbdataset_origin import PCBDataset
+# from pysot.datasets.pcbdataset.pcbdataset_origin import PCBDataset
+from pysot.datasets.pcbdataset import get_pcbdataset
 from pysot.models.model_builder import ModelBuilder
 from pysot.tracker.siamcar_tracker import SiamCARTracker
 from pysot.utils.average_meter import AverageMeter
@@ -51,6 +52,7 @@ parser.add_argument('--dataset_name', type=str, default='', help='dataset name')
 parser.add_argument('--dataset', type=str, default='', help='training dataset')
 parser.add_argument('--test_dataset', type=str, default='', help='testing dataset')
 parser.add_argument('--criteria', type=str, default='', help='criteria of dataset')
+parser.add_argument('--method', type=str, default='', help='origin / new')
 parser.add_argument('--neg', type=float, default=0.0, help='negative pair')
 parser.add_argument('--bg', type=str, help='background of template')
 parser.add_argument('--epoch', type=int, help='epoch')
@@ -104,8 +106,12 @@ class SiamCARTrainer(object):
     def CreateDatasets(self, validation_split: float = 0.0, random_seed: int = 42):
         logger.info("Building dataset...")
         # 現在 neg = 0，所以 train_dataset 可以沿用
-        dataset = PCBDataset(args, "train")
-        test_dataset = PCBDataset(args, "test")
+        # dataset = PCBDataset(args, "train")
+        # test_dataset = PCBDataset(args, "test")
+        # 改成這樣真的滿強的，就不用再手動改
+        pcbdataset = get_pcbdataset(args.method)
+        dataset = pcbdataset(args, "train")
+        test_dataset = pcbdataset(args, "test")
 
         dataset_size = len(dataset)
         indices = list(range(dataset_size))
@@ -127,7 +133,7 @@ class SiamCARTrainer(object):
                 batch_size=batch_size,
                 num_workers=num_workers,
                 pin_memory=False,
-                collate_fn=collate_fn_new
+                collate_fn=collate_fn
             )
             return data_loader
 
@@ -225,6 +231,33 @@ class SiamCARTrainer(object):
 
     # Training
     def StartFit(self):
+        # constants = {
+        #     "Dataset": args.dataset_name,
+        #     "Criteria": args.criteria,
+        #     "Train Dataset Size": len(self.train_loader.dataset),
+        #     "Test Dataset Size": len(self.test_loader.dataset),
+        #     "Validation Ratio": cfg.DATASET.VALIDATION_SPLIT,
+        #     "Negative Ratio": args.neg,
+        #     "Background": args.bg,
+        #     "Epochs": args.epoch,
+        #     "Batch": args.batch_size,
+        #     "Accumulate iter": args.accum_iter,
+        #     "lr": cfg.TRAIN.LR.KWARGS.start_lr,
+        #     "weight_decay": cfg.TRAIN.WEIGHT_DECAY,
+        #     "Model Pretrained": cfg.TRAIN.PRETRAINED,
+        #     "Backbone Pretrained": cfg.BACKBONE.PRETRAINED,
+        #     "Backbone Train Epoch": cfg.BACKBONE.TRAIN_EPOCH,
+        #     "cen weight": cfg.TRAIN.CEN_WEIGHT,
+        #     "cls weight": cfg.TRAIN.CLS_WEIGHT,
+        #     "loc weight": cfg.TRAIN.LOC_WEIGHT,
+        # }
+        # wandb.init(
+        #     project="SiamCAR",
+        #     entity="adrien88",
+        #     name=f"{args.dataset_name}_{args.criteria}_{args.method}_neg{args.neg}_x{cfg.TRAIN.SEARCH_SIZE}_bg{args.bg}_e{args.epoch}_b{args.batch_size}",
+        #     config=constants
+        # )
+
         cur_lr = self.lr_scheduler.get_cur_lr()
         rank = get_rank()
         print("Train rank:", rank)
@@ -238,10 +271,6 @@ class SiamCARTrainer(object):
         num_per_epoch = len(self.train_loader)
         start_epoch = cfg.TRAIN.START_EPOCH
 
-        epoch_record = {'epoch': 0, 'loss': 0.0}
-        batch_record = {'batch': 0, 'loss': 0.0}
-        self.cb.on_train_begin()
-
         if get_rank() == 0:
             create_dir(cfg.TRAIN.MODEL_DIR)
 
@@ -249,9 +278,8 @@ class SiamCARTrainer(object):
         for epoch in range(cfg.TRAIN.START_EPOCH, args.epoch):
             # one epoch
             logger.info(f"Epoch: {epoch + 1}")
-
             train_loss = dict(cen=0.0, cls=0.0, loc=0.0, total=0.0, cls_pos=0.0, cls_neg=0.0)
-            val_loss = dict(cen=0.0, cls=0.0, loc=0.0, total=0.0, cls_pos=0.0, cls_neg=0.0)
+            test_loss = dict(cen=0.0, cls=0.0, loc=0.0, total=0.0, cls_pos=0.0, cls_neg=0.0)
 
             self.lr_scheduler.step(epoch)
             cur_lr = self.lr_scheduler.get_cur_lr()
@@ -270,9 +298,6 @@ class SiamCARTrainer(object):
             train_no_pos_num = 0
             for idx, data in enumerate(self.train_loader):
                 # one batch
-
-                data_time = average_reduce(time.time() - end)
-
                 # Runs in mixed precision
                 with autocast():
                     outputs = self.model(data)
@@ -298,11 +323,10 @@ class SiamCARTrainer(object):
 
                     reduce_gradients(self.model)
 
+                    # Ref: https://neptune.ai/blog/understanding-gradient-clipping-and-how-it-can-fix-exploding-gradients-problem
+                    # Clip gradient
                     # Ref: https://pytorch.org/docs/master/notes/amp_examples.html#gradient-clipping
                     self.scaler.unscale_(self.optimizer)
-
-                    # clip gradient
-                    # Ref: https://neptune.ai/blog/understanding-gradient-clipping-and-how-it-can-fix-exploding-gradients-problem
                     clip_grad_norm_(self.model.parameters(), cfg.TRAIN.GRAD_CLIP)
 
                     # self.optimizer.step()
@@ -327,10 +351,6 @@ class SiamCARTrainer(object):
             train_loss = {key: value / len(self.train_loader)
                           for key, value in train_loss.items()}
 
-            epoch_record['epoch'] = epoch + 1
-            epoch_record['loss'] = train_loss['total']
-            self.cb.on_epoch_end(epoch_record)
-
             elapsed = time.time() - end
             print(f"({elapsed:.3f}s, {elapsed / len(self.train_loader.dataset):.3}s/img)")
 
@@ -343,38 +363,38 @@ class SiamCARTrainer(object):
                 f" | cls_pos_loss: {train_loss['cls_pos']:<6.3f}"
                 f" | cls_neg_loss: {train_loss['cls_neg']:<6.3f}"
             )
-            print(f"No cls_pos num in train: {train_no_pos_num}")
+            print(f"Num of no cls_pos in train: {train_no_pos_num}")
 
             ######################################
             # Validating
             ######################################
-            # 現在用的是 test_loader！
+            # 就直接用 test_loader 當作 validation
             val_no_pos_num = 0
             with torch.no_grad():
                 for idx, data in enumerate(self.test_loader):
+                    # Runs in mixed precision
                     with autocast():
                         outputs = self.model(data)
                     if outputs['cls_pos'] == 0:
                         # TODO: 同 train
                         val_no_pos_num += 1
                         continue
-                    val_loss = {key: value + float(outputs[key].item()) for key, value in val_loss.items()}
-            val_loss = {key: value / len(self.test_loader) for key, value in val_loss.items()}
+                    test_loss = {key: value + float(outputs[key].item()) for key, value in test_loss.items()}
+            test_loss = {key: value / len(self.test_loader) for key, value in test_loss.items()}
             print(
                 "--- Validation ---\n"
-                f"cen_loss: {val_loss['cen']:<6.3f}"
-                f" | cls_loss: {val_loss['cls']:<6.3f}"
-                f" | loc_loss: {val_loss['loc']:<6.3f}"
-                f" | total_loss: {val_loss['total']:<6.3f}"
-                f" | cls_pos_loss: {val_loss['cls_pos']:<6.3f}"
-                f" | cls_neg_loss: {val_loss['cls_neg']:<6.3f}"
+                f"cen_loss: {test_loss['cen']:<6.3f}"
+                f" | cls_loss: {test_loss['cls']:<6.3f}"
+                f" | loc_loss: {test_loss['loc']:<6.3f}"
+                f" | total_loss: {test_loss['total']:<6.3f}"
+                f" | cls_pos_loss: {test_loss['cls_pos']:<6.3f}"
+                f" | cls_neg_loss: {test_loss['cls_neg']:<6.3f}"
             )
-            print(f"No cls_pos num in val: {val_no_pos_num}")
+            print(f"Num of no cls_pos in val: {val_no_pos_num}")
 
             ######################################
             # Evaluating
             ######################################
-            # ipdb.set_trace()
             if (epoch + 1) == 1 or (epoch + 1) % cfg.TRAIN.EVAL_FREQ == 0:
                 dummy_model_dir = "./save_models/dummy_model_titan"
                 create_dir(dummy_model_dir)
@@ -387,22 +407,18 @@ class SiamCARTrainer(object):
                 }, dummy_model_path)
                 print(f"Save dummy_model: {dummy_model_path}")
 
-                # Create model
+                # Load model & Build tracker
                 eval_model = ModelBuilder()
-                # Load model
                 eval_model = load_pretrain(eval_model, dummy_model_path).cuda().train()
                 # 在 cfg.BACKBONE.TRAIN_EPOCH 之前要把 Backbone 的 Batch Norm 的層鎖住
                 if (epoch + 1) < cfg.BACKBONE.TRAIN_EPOCH:
                     for m in eval_model.backbone.modules():
                         if isinstance(m, nn.BatchNorm2d):
                             m.eval()
-                # Build tracker
                 tracker = SiamCARTracker(eval_model, cfg.TRACK)
 
                 logger.info("Train evaluating...")
                 train_metrics = evaluate(self.train_eval_loader, tracker)
-                # logger.info("Validation evaluating...")
-                # val_metrics = evaluate(self.val_eval_loader, tracker)
                 logger.info("Test evaluating...")
                 test_metrics = evaluate(self.test_eval_loader, tracker)
 
@@ -418,10 +434,6 @@ class SiamCARTrainer(object):
                         "Precision": train_metrics['precision'],
                         "Recall": train_metrics['recall']
                     },
-                    # "val_metrics": {
-                    #     "Precision": val_metrics['precision'],
-                    #     "Recall": val_metrics['recall']
-                    # },
                     "test_metrics": {
                         "Precision": test_metrics['precision'],
                         "Recall": test_metrics['recall']
@@ -437,13 +449,13 @@ class SiamCARTrainer(object):
                     "cls_pos_loss": train_loss['cls_pos'],
                     "cls_neg_loss": train_loss['cls_neg']
                 },
-                "val": {
-                    "cen_loss": val_loss['cen'],
-                    "cls_loss": val_loss['cls'],
-                    "loc_loss": val_loss['loc'],
-                    "total_loss": val_loss['total'],
-                    "cls_pos_loss": val_loss['cls_pos'],
-                    "cls_neg_loss": val_loss['cls_neg']
+                "test": {
+                    "cen_loss": test_loss['cen'],
+                    "cls_loss": test_loss['cls'],
+                    "loc_loss": test_loss['loc'],
+                    "total_loss": test_loss['total'],
+                    "cls_pos_loss": test_loss['cls_pos'],
+                    "cls_neg_loss": test_loss['cls_neg']
                 },
                 "epoch": epoch + 1
             }, commit=True)
@@ -453,10 +465,10 @@ class SiamCARTrainer(object):
             ######################################
             # if ((epoch + 1) % cfg.TRAIN.SAVE_MODEL_FREQ) == 0:
             #     model_dir = os.path.join(
-            #         cfg.TRAIN.MODEL_DIR, args.dataset_name, args.criteria,
-            #         f"{args.dataset_name}_{args.criteria}_origin_neg{args.neg}_x{cfg.TRAIN.SEARCH_SIZE}_bg{args.bg}_e{args.epoch}_b{args.batch_size}")
+            #         cfg.TRAIN.MODEL_DIR, args.dataset_name, args.criteria, args.method,
+            #         f"{args.dataset_name}_{args.criteria}_{args.method}_neg{args.neg}_x{cfg.TRAIN.SEARCH_SIZE}_bg{args.bg}_e{args.epoch}_b{args.batch_size}")
             #     create_dir(model_dir)
-            #     model_path = os.path.join(model_dir + f"/model_e{epoch + 1}.pth")
+            #     model_path = os.path.join(model_dir + f"/checkpoint_e{epoch + 1}.pth")
             #     torch.save({
             #         'epoch': epoch + start_epoch,
             #         'state_dict': self.model.state_dict(),
@@ -485,36 +497,11 @@ class SiamCARTrainer(object):
 
 
 if __name__ == '__main__':
-
     # load cfg
     cfg.merge_from_file(args.cfg)
 
     # PermissionError
     os.environ['WANDB_DIR'] = './wandb_titan'
-    constants = {
-        "Dataset": args.dataset_name,
-        "Criteria": args.criteria,
-        "Validation Ratio": cfg.DATASET.VALIDATION_SPLIT,
-        "Negative Ratio": args.neg,
-        "Background": args.bg,
-        "Epochs": args.epoch,
-        "Batch": args.batch_size,
-        "Accumulate iter": args.accum_iter,
-        "lr": cfg.TRAIN.LR.KWARGS.start_lr,
-        "weight_decay": cfg.TRAIN.WEIGHT_DECAY,
-        "Model Pretrained": cfg.TRAIN.PRETRAINED,
-        "Backbone Pretrained": cfg.BACKBONE.PRETRAINED,
-        "Backbone Train Epoch": cfg.BACKBONE.TRAIN_EPOCH,
-        "cen weight": cfg.TRAIN.CEN_WEIGHT,
-        "cls weight": cfg.TRAIN.CLS_WEIGHT,
-        "loc weight": cfg.TRAIN.LOC_WEIGHT,
-    }
-    wandb.init(
-        project="SiamCAR",
-        entity="adrien88",
-        name=f"{args.dataset_name}_{args.criteria}_origin_neg{args.neg}_x{cfg.TRAIN.SEARCH_SIZE}_bg{args.bg}_e{args.epoch}_b{args.batch_size}",
-        config=constants
-    )
 
     Trainer = SiamCARTrainer()
     Trainer.CreateDatasets(cfg.DATASET.VALIDATION_SPLIT, random_seed=42)
