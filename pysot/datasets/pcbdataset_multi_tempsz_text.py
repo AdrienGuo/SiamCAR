@@ -18,7 +18,7 @@ import numpy as np
 from torch.utils.data import Dataset
 
 from pysot.utils.bbox import center2corner, Center
-from pysot.datasets.augmentation import Augmentation
+from pysot.datasets.augmentation.augmentation import Augmentation
 from pysot.core.config import cfg
 import xml.etree.ElementTree as ET
 

@@ -15,9 +15,9 @@ import numpy as np
 import torch
 from PIL import Image
 from pysot.core.config import cfg
-from pysot.datasets.augmentation import Augmentation
+from pysot.datasets.augmentation.augmentation import Augmentation
 from pysot.datasets.image_crop import crop, resize
-from pysot.datasets.pcb_crop.pcb_crop_new import PCBCrop
+from pysot.datasets.pcb_crop.pcb_crop_search import PCBCrop
 from pysot.utils.bbox import Center, center2corner, ratio2real
 from pysot.utils.check_image import create_dir, draw_box, save_image
 from torch.utils.data import Dataset
@@ -36,7 +36,7 @@ if pyv[0] == '3':
     cv2.ocl.setUseOpenCL(False)
 
     
-class PCBDatasetNew(Dataset):
+class PCBDatasetSearch(Dataset):
     def __init__(self, args, mode: str, loader=default_loader):
         """ 代號
             z: template

@@ -10,10 +10,22 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def create_dir(dir_path):
-    if not os.path.exists(dir_path):
-        os.makedirs(dir_path)
-        print(f"Create new dir: {dir_path}")
+def create_dir(dir, sub_dir=None):
+    if sub_dir is not None:
+        if isinstance(sub_dir, list):
+            for dir_name in sub_dir:
+                dir = os.path.join(dir, dir_name)
+        else:
+            dir = os.path.join(dir, sub_dir)
+    if not os.path.exists(dir):
+        os.makedirs(dir)
+        print(f"Create new dir: {dir}")
+    return dir
+
+
+def get_path(dir, file):
+    path = os.path.join(dir, file)
+    return path
 
 
 def save_image(image, save_path):
@@ -21,6 +33,11 @@ def save_image(image, save_path):
     image_new = np.copy(image)
     cv2.imwrite(save_path, image_new)
     print(f"Save image to: {save_path}")
+
+
+def save_fig(fig, save_path):
+    fig.savefig(save_path)
+    print(f"Save fig to: {save_path}")
 
 
 def draw_box(image, boxes, type=None, scores: np = None):
@@ -80,7 +97,7 @@ def draw_preds(search_image, scores, annotation_path, idx):
         template = template.split(',')
         template = list(map(float, template))
         if not annos:    # 當沒有偵測到物件時
-            print("--- There is no predicted item in this image. ---")
+            print("--- There is no predicted item in this image ---")
         else:
             for anno in annos:
                 anno = anno.strip('\n')
@@ -90,7 +107,7 @@ def draw_preds(search_image, scores, annotation_path, idx):
                 preds.append(anno[:-1])  # 最後一個是 score
 
     # Draw template
-    # search_image = draw_box(search_image, [template], type="template")
+    search_image = draw_box(search_image, [template], type="template")
     # Draw preds
     pred_image = draw_box(search_image, preds, type="pred", scores=scores)
 
@@ -98,7 +115,7 @@ def draw_preds(search_image, scores, annotation_path, idx):
 
 
 # Ref: https://medium.com/%E6%89%8B%E5%AF%AB%E7%AD%86%E8%A8%98/grad-cam-introduction-d0e48eb64adb
-def draw_heatmap(img, cls, alpha=0.9):
+def draw_heatmap(img, heatmap, alpha=0.9):
     assert len(img.shape) == 3, "ERROR, img is wrong!!"
     img_h, img_w = img.shape[:2]
 
@@ -107,16 +124,16 @@ def draw_heatmap(img, cls, alpha=0.9):
     img = np.uint8(img)
 
     # Resize heatmap as image
-    cls = cv2.resize(cls, (img_w, img_h))
+    heatmap = cv2.resize(heatmap, (img_w, img_h))
 
     # Display
     # plt will cause memory leak if not clear it.
     fig, ax = plt.subplots(num=1, clear=True)
-    # Add text (probability info)
-    ax.text(150, -10, f"Max: {str(np.around(cls.max(), 3))}", fontsize=12)
+    # Probability Info
+    ax.text(img_w // 2, -10, f"Max: {str(np.around(heatmap.max(), 3))}", fontsize=12)
     plt.imshow(img, alpha=alpha)
     # Set the colorbar range (vmin, vmax)
-    plt.imshow(cls, alpha=0.2, cmap="jet", vmin=0.0, vmax=1.0)
+    plt.imshow(heatmap, alpha=0.2, cmap="jet", vmin=0.0, vmax=1.0)
     plt.colorbar()
 
     return plt

@@ -223,11 +223,12 @@ class BasicBlock(nn.Module):
         self.conv1 = nn.Conv2d(inplanes, planes,
                                stride=stride, dilation=dd, bias=False,
                                kernel_size=3, padding=pad)
-        # TODO: track_running_stats=False
         self.bn1 = nn.BatchNorm2d(planes)
+        # self.bn1 = nn.BatchNorm2d(planes, track_running_stats=False)
         self.relu = nn.ReLU(inplace=True)
         self.conv2 = conv3x3(planes, planes, dilation=dilation)
         self.bn2 = nn.BatchNorm2d(planes)
+        # self.bn2 = nn.BatchNorm2d(planes, track_running_stats=False)
         self.downsample = downsample
         self.stride = stride
 
@@ -235,6 +236,8 @@ class BasicBlock(nn.Module):
         residual = x
 
         out = self.conv1(x)
+        # TODO: 把 bn 刪掉
+        # relu 是不是也要刪掉阿？
         out = self.bn1(out)
         out = self.relu(out)
 
@@ -259,6 +262,7 @@ class Bottleneck(nn.Module):
         super(Bottleneck, self).__init__()
         self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=1, bias=False)
         self.bn1 = nn.BatchNorm2d(planes)
+        # self.bn1 = nn.BatchNorm2d(planes, track_running_stats=False)
         padding = 2 - stride
         if downsample is not None and dilation > 1:
             dilation = dilation // 2
@@ -272,8 +276,10 @@ class Bottleneck(nn.Module):
         self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=stride,
                                padding=padding, bias=False, dilation=dilation)
         self.bn2 = nn.BatchNorm2d(planes)
+        # self.bn2 = nn.BatchNorm2d(planes, track_running_stats=False)
         self.conv3 = nn.Conv2d(planes, planes * 4, kernel_size=1, bias=False)
         self.bn3 = nn.BatchNorm2d(planes * 4)
+        # self.bn3 = nn.BatchNorm2d(planes * 4, track_running_stats=False)
         self.relu = nn.ReLU(inplace=True)
         self.downsample = downsample
         self.stride = stride
@@ -315,6 +321,7 @@ class ResNet(nn.Module):
             3, 64, kernel_size=7, stride=2, padding=0, bias=False
         )
         self.bn1 = nn.BatchNorm2d(64)
+        # self.bn1 = nn.BatchNorm2d(64, track_running_stats=False)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         self.layer1 = self._make_layer(block, planes=64, blocks=layers[0])
@@ -360,6 +367,7 @@ class ResNet(nn.Module):
                         kernel_size=1, stride=stride, bias=False
                     ),
                     nn.BatchNorm2d(planes * block.expansion),
+                    # nn.BatchNorm2d(planes * block.expansion, track_running_stats=False),
                 )
             else:
                 if dilation > 1:
@@ -375,6 +383,7 @@ class ResNet(nn.Module):
                         padding=padding, dilation=dd
                     ),
                     nn.BatchNorm2d(planes * block.expansion),
+                    # nn.BatchNorm2d(planes * block.expansion, track_running_stats=False),
                 )
 
         layers = []

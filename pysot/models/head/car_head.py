@@ -1,5 +1,6 @@
 import math
 
+import ipdb
 import torch
 from torch import nn
 
@@ -26,7 +27,9 @@ class CARHead(torch.nn.Module):
                     padding=1
                 )
             )
-            cls_tower.append(nn.GroupNorm(32, in_channels))
+            # cls_tower.append(nn.GroupNorm(32, in_channels))
+            cls_tower.append(nn.BatchNorm2d(in_channels))
+            # cls_tower.append(nn.BatchNorm2d(in_channels, track_running_stats=False))
             cls_tower.append(nn.ReLU())
             bbox_tower.append(
                 nn.Conv2d(
@@ -37,7 +40,9 @@ class CARHead(torch.nn.Module):
                     padding=1
                 )
             )
-            bbox_tower.append(nn.GroupNorm(32, in_channels))
+            # bbox_tower.append(nn.GroupNorm(32, in_channels))
+            bbox_tower.append(nn.BatchNorm2d(in_channels))
+            # bbox_tower.append(nn.BatchNorm2d(in_channels, track_running_stats=False))
             bbox_tower.append(nn.ReLU())
 
         self.add_module('cls_tower', nn.Sequential(*cls_tower))

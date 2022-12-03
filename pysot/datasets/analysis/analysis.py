@@ -1,3 +1,12 @@
+# 判斷我將 train 資料集切成 train, validation 後，
+# 這兩個資料集的分佈是否均勻。
+# 做這的目的是因為 train, val 的效果一直差很多，
+# 所以才懷疑是否因為在切分資料集的時候，就那麼的剛好，
+# 兩個資料集的分佈差很多導致效果差很多，
+# 不過想當然 random 是真的滿 random，
+# 資料集的分佈很相似，所以不是這個問題。
+
+
 import argparse
 import os
 import random
@@ -8,7 +17,7 @@ from torch.utils.data import DataLoader, Subset
 
 from pysot.core.config import cfg
 from pysot.datasets.collate import collate_fn_new
-from pysot.datasets.pcbdataset.pcbdataset_new import PCBDataset
+from pysot.datasets.pcbdataset.pcbdataset_search import PCBDataset
 
 plt.style.use('ggplot')
 

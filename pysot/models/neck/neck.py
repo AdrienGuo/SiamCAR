@@ -14,6 +14,7 @@ class AdjustLayer(nn.Module):
         self.downsample = nn.Sequential(
             nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False),
             nn.BatchNorm2d(out_channels),
+            # nn.BatchNorm2d(out_channels, track_running_stats=False),
         )
 
     def forward(self, x):

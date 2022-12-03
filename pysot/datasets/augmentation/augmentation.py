@@ -4,8 +4,8 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
 import cv2
-import ipdb
 import numpy as np
+
 from pysot.utils.bbox import Center, Corner, center2corner, corner2center
 
 
@@ -94,44 +94,50 @@ class Augmentation:
 
         # adjust target bounding box
         x1, y1 = crop_bbox.x1, crop_bbox.y1
-        
-        box=[]
-        
+        bbox = Corner(bbox.x1 - x1, bbox.y1 - y1,
+                      bbox.x2 - x1, bbox.y2 - y1)
 
         if self.scale:
-            for i in range(len(bbox)):
-                 
-                box.append(Corner(bbox[i].x1 / scale_x, bbox[i].y1 / scale_y,
-                          bbox[i].x2 / scale_x, bbox[i].y2 / scale_y))
-        else:
-            for i in range(len(bbox)):
-                box.append(Corner(bbox[i].x1 - x1, bbox[i].y1 - y1,
-                          bbox[i].x2 - x1, bbox[i].y2 - y1))
-            
+            bbox = Corner(bbox.x1 / scale_x, bbox.y1 / scale_y,
+                          bbox.x2 / scale_x, bbox.y2 / scale_y)
 
         image = self._crop_roi(image, crop_bbox, size)
-        return image, box
-
-    def _flip_aug(self, image, bbox):
-        image = cv2.flip(image, 1)
-        width = image.shape[1]
-        bbox = Corner(width - 1 - bbox.x2, bbox.y1,
-                      width - 1 - bbox.x1, bbox.y2)
         return image, bbox
 
-    def __call__(self, image, bbox, size, gray=False):
-        image_tmp = image.copy()
-        bbox_tmp = bbox
+    def horizontal_flip(self, image, bbox):
+        image = image.copy()
+        bbox = bbox.copy()
 
+        image = cv2.flip(image, 1)  # 水平翻轉
+        width = image.shape[1]
+        bbox_x1 = width - bbox[:, 2] - 1  # x1 = w - x2
+        bbox_x2 = width - bbox[:, 0] - 1  # x2 = w - x1
+        bbox[:, 0] = bbox_x1
+        bbox[:, 2] = bbox_x2
+        return image, bbox
+
+    def vertical_flip(self, img, bbox):
+        img = img.copy()
+        bbox = bbox.copy()
+
+        img = cv2.flip(img, 0)  # 垂直翻轉
+        img_h = img.shape[0]
+        bbox_y1 = img_h - bbox[:, 3] - 1  # y1 = h - y2
+        bbox_y2 = img_h - bbox[:, 1] - 1  # y2 = h - y1
+        bbox[:, 1] = bbox_y1
+        bbox[:, 3] = bbox_y2
+        return img, bbox
+
+    def __call__(self, image, bbox, size=None, gray=False):
         shape = image.shape
-        crop_bbox = center2corner(Center(shape[0]//2, shape[1]//2,
-                                         size-1, size-1))
+        # crop_bbox = center2corner(Center(shape[0]//2, shape[1]//2,
+        #                                  size-1, size-1))
         # gray augmentation
         if gray:
             image = self._gray_aug(image)
 
         # shift scale augmentation
-        #image, bbox = self._shift_scale_aug(image, bbox, crop_bbox, size)
+        # image, bbox = self._shift_scale_aug(image, bbox, crop_bbox, size)
 
         # color augmentation
         if self.color > np.random.random():
@@ -142,11 +148,7 @@ class Augmentation:
             image = self._blur_aug(image)
 
         # flip augmentation
-        if self.flip and self.flip > np.random.random():
-            image, bbox = self._flip_aug(image, bbox)
-
-        assert np.array_equal(image_tmp, image), "should be the same"
-        assert bbox_tmp == bbox, "should be the same"
-        del image_tmp, bbox_tmp
+        # if self.flip and self.flip > np.random.random():
+        #     image, bbox = self._flip_aug(image, bbox)
 
         return image, bbox

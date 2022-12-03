@@ -48,16 +48,18 @@ from tools.test_amy import test_amy
 
 logger = logging.getLogger('global')
 parser = argparse.ArgumentParser(description='siamcar tracking')
+parser.add_argument('--loss', type=str, default='', help='loss')
 parser.add_argument('--dataset_name', type=str, default='', help='dataset name')
 parser.add_argument('--dataset', type=str, default='', help='training dataset')
 parser.add_argument('--test_dataset', type=str, default='', help='testing dataset')
 parser.add_argument('--criteria', type=str, default='', help='criteria of dataset')
+parser.add_argument('--target', type=str, default='', help='Number of targets to predict')
 parser.add_argument('--method', type=str, default='', help='origin / new')
 parser.add_argument('--neg', type=float, default=0.0, help='negative pair')
 parser.add_argument('--bg', type=str, help='background of template')
 parser.add_argument('--epoch', type=int, help='epoch')
 parser.add_argument('--batch_size', type=int, help='batch size')
-parser.add_argument('--accum_iter', type=int, help='accumulate gradient iteration')
+parser.add_argument('--accum_iters', type=int, help='accumulate gradient iterations')
 parser.add_argument('--cfg', type=str,
                              default='./experiments/siamcar_r50/config.yaml', help='configuration of tracking')
 parser.add_argument('--seed', type=int, default=123456, help='random seed')
@@ -105,11 +107,9 @@ class SiamCARTrainer(object):
 
     def CreateDatasets(self, validation_split: float = 0.0, random_seed: int = 42):
         logger.info("Building dataset...")
-        # 現在 neg = 0，所以 train_dataset 可以沿用
-        # dataset = PCBDataset(args, "train")
-        # test_dataset = PCBDataset(args, "test")
         # 改成這樣真的滿強的，就不用再手動改
         pcbdataset = get_pcbdataset(args.method)
+        # 現在 neg = 0，所以 train_dataset 可以沿用
         dataset = pcbdataset(args, "train")
         test_dataset = pcbdataset(args, "test")
 
@@ -229,32 +229,40 @@ class SiamCARTrainer(object):
                 if isinstance(m, nn.BatchNorm2d):
                     m.eval()
 
-    # Training
     def StartFit(self):
-        # constants = {
-        #     "Dataset": args.dataset_name,
-        #     "Criteria": args.criteria,
-        #     "Train Dataset Size": len(self.train_loader.dataset),
-        #     "Test Dataset Size": len(self.test_loader.dataset),
-        #     "Validation Ratio": cfg.DATASET.VALIDATION_SPLIT,
-        #     "Negative Ratio": args.neg,
-        #     "Background": args.bg,
-        #     "Epochs": args.epoch,
-        #     "Batch": args.batch_size,
-        #     "Accumulate iter": args.accum_iter,
-        #     "lr": cfg.TRAIN.LR.KWARGS.start_lr,
-        #     "weight_decay": cfg.TRAIN.WEIGHT_DECAY,
-        #     "Model Pretrained": cfg.TRAIN.PRETRAINED,
-        #     "Backbone Pretrained": cfg.BACKBONE.PRETRAINED,
-        #     "Backbone Train Epoch": cfg.BACKBONE.TRAIN_EPOCH,
-        #     "cen weight": cfg.TRAIN.CEN_WEIGHT,
-        #     "cls weight": cfg.TRAIN.CLS_WEIGHT,
-        #     "loc weight": cfg.TRAIN.LOC_WEIGHT,
-        # }
+        model_name = \
+            f"{cfg.TRAIN.CLS_LOSS_METHOD}_{args.dataset_name}_{args.criteria}" \
+            f"_{args.target}_{args.method}" \
+            f"_{cfg.TRAIN.CEN_WEIGHT}_{cfg.TRAIN.CLS_WEIGHT}_{cfg.TRAIN.LOC_WEIGHT}" \
+            f"_neg{args.neg}_x{cfg.TRAIN.SEARCH_SIZE}_bg{args.bg}_e{args.epoch}_b{args.batch_size}"
+
+        constants = {
+            'Dataset': args.dataset_name,
+            'Criteria': args.criteria,
+            'Train Dataset Size': len(self.train_loader.dataset),
+            'Test Dataset Size': len(self.test_loader.dataset),
+            'Validation Ratio': cfg.DATASET.VALIDATION_SPLIT,
+            'Negative Ratio': args.neg,
+            'Background': args.bg,
+            'Epochs': args.epoch,
+            'Batch': args.batch_size,
+            'Accumulate iter': args.accum_iters,
+            'lr': cfg.TRAIN.LR.KWARGS.start_lr,
+            'weight_decay': cfg.TRAIN.WEIGHT_DECAY,
+            'Model Pretrained': cfg.TRAIN.PRETRAINED,
+            'Backbone Pretrained': cfg.BACKBONE.PRETRAINED,
+            'Backbone Train Epoch': cfg.BACKBONE.TRAIN_EPOCH,
+            'cen weight': cfg.TRAIN.CEN_WEIGHT,
+            'cls weight': cfg.TRAIN.CLS_WEIGHT,
+            'loc weight': cfg.TRAIN.LOC_WEIGHT,
+            'cls Loss Method': cfg.TRAIN.CLS_LOSS_METHOD,
+            'Alpha (Focal Loss)': cfg.TRAIN.LOSS_ALPHA,
+            'Gamma (Focal Loss)': cfg.TRAIN.LOSS_GAMMA,
+        }
         # wandb.init(
         #     project="SiamCAR",
         #     entity="adrien88",
-        #     name=f"{args.dataset_name}_{args.criteria}_{args.method}_neg{args.neg}_x{cfg.TRAIN.SEARCH_SIZE}_bg{args.bg}_e{args.epoch}_b{args.batch_size}",
+        #     name=model_name,
         #     config=constants
         # )
 
@@ -296,7 +304,7 @@ class SiamCARTrainer(object):
             self.model.train()
             self.freeze_backbone_BN(epoch + 1)
             train_no_pos_num = 0
-            for idx, data in enumerate(self.train_loader):
+            for batch_idx, data in enumerate(self.train_loader):
                 # one batch
                 # Runs in mixed precision
                 with autocast():
@@ -308,39 +316,39 @@ class SiamCARTrainer(object):
                     train_no_pos_num += 1
                     continue
 
+                loss = outputs['total'] / args.accum_iters
+                # loss.backward()
+                self.scaler.scale(loss).backward()
+                # TODO: accumulate gradient
+                if (batch_idx + 1) % args.accum_iters == 0 or (batch_idx + 1) == len(self.train_loader):
+                    if is_valid_number(loss.data.item()):
+                        reduce_gradients(self.model)
+
+                        # Ref: https://neptune.ai/blog/understanding-gradient-clipping-and-how-it-can-fix-exploding-gradients-problem
+                        # Clip gradient
+                        # Ref: https://pytorch.org/docs/master/notes/amp_examples.html#gradient-clipping
+                        self.scaler.unscale_(self.optimizer)
+                        clip_grad_norm_(self.model.parameters(), cfg.TRAIN.GRAD_CLIP)
+
+                        # self.optimizer.step()
+                        self.scaler.step(self.optimizer)
+                        self.scaler.update()
+
+                        # TODO: 不知道 zero_grad 能不能放這裡
+                        self.optimizer.zero_grad()
+
+                    print(
+                        f"cen_loss: {outputs['cen']:<6.3f}"
+                        f" | cls_loss: {outputs['cls']:<6.3f}"
+                        f" | loc_loss: {outputs['loc']:<6.3f}"
+                        f" | total_loss: {outputs['total']:<6.3f}"
+                        f" | cls_pos_loss: {outputs['cls_pos']:<6.3f}"
+                        f" | cls_neg_loss: {outputs['cls_neg']:<6.3f}"
+                    )
+
                 # train_loss 會個別對應 outputs 的 key 後疊加
                 train_loss = {key: value + float(outputs[key].item())
-                            for key, value in train_loss.items()}
-
-                loss = outputs['total']
-                # TODO: accumulate gradient
-                if is_valid_number(loss.data.item()):
-                    # TODO: 不知道 zero_grad 能不能放這裡
-                    self.optimizer.zero_grad()
-
-                    # loss.backward()
-                    self.scaler.scale(loss).backward()
-
-                    reduce_gradients(self.model)
-
-                    # Ref: https://neptune.ai/blog/understanding-gradient-clipping-and-how-it-can-fix-exploding-gradients-problem
-                    # Clip gradient
-                    # Ref: https://pytorch.org/docs/master/notes/amp_examples.html#gradient-clipping
-                    self.scaler.unscale_(self.optimizer)
-                    clip_grad_norm_(self.model.parameters(), cfg.TRAIN.GRAD_CLIP)
-
-                    # self.optimizer.step()
-                    self.scaler.step(self.optimizer)
-                    self.scaler.update()
-
-                print(
-                    f"cen_loss: {outputs['cen']:<6.3f}"
-                    f" | cls_loss: {outputs['cls']:<6.3f}"
-                    f" | loc_loss: {outputs['loc']:<6.3f}"
-                    f" | total_loss: {outputs['total']:<6.3f}"
-                    f" | cls_pos_loss: {outputs['cls_pos']:<6.3f}"
-                    f" | cls_neg_loss: {outputs['cls_neg']:<6.3f}"
-                )
+                              for key, value in train_loss.items()}
 
             # Warning:
             # https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
@@ -367,8 +375,8 @@ class SiamCARTrainer(object):
 
             ######################################
             # Validating
-            ######################################
             # 就直接用 test_loader 當作 validation
+            ######################################
             val_no_pos_num = 0
             with torch.no_grad():
                 for idx, data in enumerate(self.test_loader):
@@ -409,7 +417,8 @@ class SiamCARTrainer(object):
 
                 # Load model & Build tracker
                 eval_model = ModelBuilder()
-                eval_model = load_pretrain(eval_model, dummy_model_path).cuda().train()
+                eval_model = load_pretrain(eval_model, dummy_model_path).cuda().eval()
+                # eval_model = load_pretrain(eval_model, dummy_model_path).cuda().train()
                 # 在 cfg.BACKBONE.TRAIN_EPOCH 之前要把 Backbone 的 Batch Norm 的層鎖住
                 if (epoch + 1) < cfg.BACKBONE.TRAIN_EPOCH:
                     for m in eval_model.backbone.modules():
@@ -421,13 +430,6 @@ class SiamCARTrainer(object):
                 train_metrics = evaluate(self.train_eval_loader, tracker)
                 logger.info("Test evaluating...")
                 test_metrics = evaluate(self.test_eval_loader, tracker)
-
-                # TODO: 改成用亭儀的 siamtracker
-                # 先做 test 產生 annotation file
-                # test_amy(snapshot=dummy_model_path, dataset_dir=args.test_dataset)
-                # # 再從 annotation 去算 precision, recall
-                # test_metrics = evaluate_amy(snapshot=dummy_model_path, dataset_dir=args.test_dataset)
-                # print(f"Precision: {test_metrics['precision']:>6.2f} | Recall: {test_metrics['recall']:>6.2f}")
 
                 wandb.log({
                     "train_metrics": {
@@ -463,12 +465,12 @@ class SiamCARTrainer(object):
             ######################################
             # Save model
             ######################################
-            # if ((epoch + 1) % cfg.TRAIN.SAVE_MODEL_FREQ) == 0:
+            # if (epoch + 1) == 1 or ((epoch + 1) % cfg.TRAIN.SAVE_MODEL_FREQ) == 0:
             #     model_dir = os.path.join(
-            #         cfg.TRAIN.MODEL_DIR, args.dataset_name, args.criteria, args.method,
-            #         f"{args.dataset_name}_{args.criteria}_{args.method}_neg{args.neg}_x{cfg.TRAIN.SEARCH_SIZE}_bg{args.bg}_e{args.epoch}_b{args.batch_size}")
+            #         cfg.TRAIN.MODEL_DIR, args.dataset_name, args.criteria, args.target, args.method, model_name
+            #     )
             #     create_dir(model_dir)
-            #     model_path = os.path.join(model_dir + f"/checkpoint_e{epoch + 1}.pth")
+            #     model_path = os.path.join(model_dir, f"ckpt{epoch + 1}.pth")
             #     torch.save({
             #         'epoch': epoch + start_epoch,
             #         'state_dict': self.model.state_dict(),
@@ -501,11 +503,11 @@ if __name__ == '__main__':
     cfg.merge_from_file(args.cfg)
 
     # PermissionError
-    os.environ['WANDB_DIR'] = './wandb_titan'
+    os.environ['WANDB_DIR'] = './wandb'
 
     Trainer = SiamCARTrainer()
-    Trainer.CreateDatasets(cfg.DATASET.VALIDATION_SPLIT, random_seed=42)
-    Trainer.SetTrainingCallback()
+    # Trainer.SetTrainingCallback()
     Trainer.CompilModel()
+    Trainer.CreateDatasets(cfg.DATASET.VALIDATION_SPLIT, random_seed=42)
     Trainer.StartFit()
     # Trainer.ConvertOnnx()

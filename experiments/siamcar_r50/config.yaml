@@ -25,9 +25,9 @@ TRACK:
 
 TRAIN:
     BASE_LR:  0.005
-    CEN_WEIGHT: 1.0
+    CEN_WEIGHT: 0.0
     CLS_WEIGHT: 1.0
-    LOC_WEIGHT: 6.0  # 3.0
+    LOC_WEIGHT: 0.0  # 3.0
     NUM_CLASSES: 2
     NUM_CONVS: 4
     PRIOR_PROB: 0.01
@@ -65,14 +65,14 @@ DATASET:
         SHIFT: 0.0 #4
         SCALE: 0.0 #0.05
         BLUR:  0.0
-        FLIP:  0.0
+        FLIP:  1.0
         COLOR: 0.0 #1.0
 
     SEARCH:
         SHIFT: 0.0 #64
         SCALE: 0.0 #0.18
         BLUR:  0.0 #0.2
-        FLIP:  0.0
+        FLIP:  1.0
         COLOR: 0.0 #1.0
 
     NEG: 0.0

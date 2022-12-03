@@ -17,7 +17,7 @@ import numpy as np
 import torch
 from PIL import Image
 from pysot.core.config import cfg
-from pysot.datasets.augmentation import Augmentation
+from pysot.datasets.augmentation.augmentation import Augmentation
 from pysot.datasets.image_crop import crop, resize
 from pysot.datasets.pcb_crop_old import PCBCrop
 from pysot.utils.bbox import Center, center2corner, ratio2real

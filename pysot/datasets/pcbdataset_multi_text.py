@@ -16,7 +16,7 @@ import numpy as np
 import torch
 from PIL import Image
 from pysot.core.config import cfg
-from pysot.datasets.augmentation import Augmentation
+from pysot.datasets.augmentation.augmentation import Augmentation
 from pysot.datasets.image_crop import crop, resize
 from pysot.utils.bbox import Center, center2corner
 from pysot.utils.check_image import create_dir, draw_box, save_image

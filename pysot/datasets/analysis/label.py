@@ -62,23 +62,27 @@ def find_not_match_labels(directory: str, threshold: float):
                     assert False, f"ERROR, annotation doesn't exist: {anno_path}"
                 f = open(anno_path, 'r')
                 lines = f.readlines()
+                cls = list()
                 anno = []
                 for line in lines:
                     line = line.strip('\n')
                     line = line.split(' ')
-                    line[0] = str(line[0])
-                    line[1:5] = map(float, line[1:5])
-                    anno.append(line)
+                    # line[0] = str(line[0])
+                    # line[1:5] = map(float, line[1:5])
+                    cls.append(str(line[0]))
+                    anno.append(list(map(float, line[1:5])))
+                    # anno.append(line)
 
                 img = cv2.imread(img_path)
                 img_h, img_w = img.shape[:2]
                 boxes_cls_map = defaultdict(list)
-                for i in range(len(anno)):
-                    cls = anno[i][0]
-                    box = np.array(anno[i][1:])  # 因為第 0 項是 cls
+                for i in range(len(cls)):
+                    # cls = anno[i][0]
+                    box = np.array(anno[i])
                     box[[0, 2]] *= img_w
                     box[[1, 3]] *= img_h
-                    boxes_cls_map[cls].append(box)
+                    # boxes_cls_map[cls].append(box)
+                    boxes_cls_map[cls[i]].append(box)
 
                 invalid_boxes_cls_map = find_not_match_labels_one_img(img_path, boxes_cls_map, threshold)
                 if invalid_boxes_cls_map:

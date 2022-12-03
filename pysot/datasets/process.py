@@ -2,6 +2,8 @@ import cv2
 import ipdb
 import numpy as np
 
+__all__ = ['resize', 'translate', 'z_score_norm']
+
 
 def resize(img, boxes, scale):
     img_h, img_w = img.shape[:2]
@@ -33,3 +35,10 @@ def translate(img, boxes, size, padding=(0, 0, 0)):
     boxes = boxes + [x, y, x, y]
 
     return img, boxes, (x, y)
+
+
+def z_score_norm(img):
+    assert isinstance(img, np.ndarray), "ERROR, img type should be numpy.ndarray!!"
+    assert img.shape[-1] == 3, "ERROR, order of dimension is wrong!!"
+    img = ((img - img.mean(axis=(0, 1))) / img.std(axis=(0, 1)))
+    return img

@@ -30,10 +30,9 @@ __C.TRAIN.RESUME = ''
 
 
 # Whole model pretrained
-# __C.TRAIN.PRETRAINED = ''
-__C.TRAIN.PRETRAINED = './tools/snapshot/model_general.pth'
-# __C.TRAIN.PRETRAINED = './save_models/dummy_model_titan/dummy_model.pth'
-# __C.TRAIN.PRETRAINED = './save_models/all/big/all_big_neg0.0_x255_bg1.0_e1000_b1/model_e950.pth'
+__C.TRAIN.PRETRAINED = ''
+# __C.TRAIN.PRETRAINED = './tools/snapshot/model_general.pth'
+
 
 __C.TRAIN.LOG_DIR = './logs/test'
 
@@ -49,12 +48,12 @@ __C.TRAIN.NUM_WORKERS = 0
 __C.TRAIN.MOMENTUM = 0.9
 __C.TRAIN.WEIGHT_DECAY = 0.0001
 
-__C.TRAIN.CEN_WEIGHT = 1.0
+__C.TRAIN.CEN_WEIGHT = 0.0
 __C.TRAIN.CLS_WEIGHT = 1.0
-__C.TRAIN.LOC_WEIGHT = 6.0
+__C.TRAIN.LOC_WEIGHT = 0.0
 
 __C.TRAIN.EVAL_FREQ = 20
-__C.TRAIN.SAVE_MODEL_FREQ = 50
+__C.TRAIN.SAVE_MODEL_FREQ = 20
 __C.TRAIN.PRINT_FREQ = 20
 
 __C.TRAIN.GRAD_CLIP = 10.0
@@ -83,8 +82,11 @@ __C.TRAIN.NUM_CONVS = 4
 
 __C.TRAIN.PRIOR_PROB = 0.01
 
+__C.TRAIN.CLS_LOSS_METHOD = 'bce'  # bce / focal
+# 當使用 Focal Loss 才會用到的 Hyperparameters
 __C.TRAIN.LOSS_ALPHA = 0.25
 __C.TRAIN.LOSS_GAMMA = 5.0
+
 
 # ------------------------------------------------------------------------ #
 # Dataset options
@@ -160,7 +162,7 @@ __C.BACKBONE.TRAIN_LAYERS = ['layer2', 'layer3', 'layer4']
 __C.BACKBONE.LAYERS_LR = 0.1
 
 # Switch to train layer
-__C.BACKBONE.TRAIN_EPOCH = 200
+__C.BACKBONE.TRAIN_EPOCH = 1
 
 # ------------------------------------------------------------------------ #
 # Adjust layer options

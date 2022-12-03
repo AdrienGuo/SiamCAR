@@ -19,12 +19,11 @@ from torchvision import transforms
 from torchvision.datasets.folder import default_loader
 
 from pysot.core.config import cfg
-from pysot.datasets.image_crop import crop, resize
 from pysot.datasets.pcb_crop.pcb_crop_origin import PCBCrop
+from pysot.datasets.augmentation.pcb_aug import PCBAug
+from pysot.datasets.process import z_score_norm
 from pysot.utils.bbox import Center, center2corner, ratio2real
 from pysot.utils.check_image import create_dir, draw_box, save_image
-
-# from re import template
 
 
 Corner = namedtuple('Corner', 'x1 y1 x2 y2')
@@ -46,13 +45,15 @@ class PCBDatasetOrigin(Dataset):
         """
         self.args = args
 
+        self.mode = mode
         if mode == "test":
             self.dataset_dir = args.test_dataset
         else:
             self.dataset_dir = args.dataset
-        images, templates, searches = self._make_dataset(self.dataset_dir)
-        images, templates, searches = self._filter_dataset(images, templates, searches, args.criteria)
-
+        images, templates, searches = self._make_dataset(self.dataset_dir, args.target)
+        images, templates, searches = self._filter_dataset(
+            images, templates, searches, args.criteria)
+        assert len(images) != 0, "ERROR, dataset is empty"
         self.images = images
         self.templates = templates
         self.searches = searches
@@ -62,93 +63,114 @@ class PCBDatasetOrigin(Dataset):
         # PCBCrop: Crop template & search (preprocess)
         self.pcb_crop = PCBCrop(zf_size_min)
 
-    def _make_dataset(self, directory: str):
+        # Augmentation
+        self.pcb_aug = PCBAug(
+            cfg.DATASET.TEMPLATE.SHIFT,
+            cfg.DATASET.TEMPLATE.SCALE,
+            cfg.DATASET.TEMPLATE.BLUR,
+            cfg.DATASET.TEMPLATE.FLIP,
+            cfg.DATASET.TEMPLATE.COLOR
+        )
+
+    def _make_dataset(self, directory: str, target: str):
         images = []
         templates = []
         searches = []
 
         # 標記錯誤的影像
         imgs_exclude = ["6_cae_cae_20200803_10.bmp"]
+        mid_imgs_exclude = ['17_ic_ic_20200810_solder_40.bmp', '17_ic_Sot23_20200820_solder_81.bmp', '5_sod_sod (7).jpg']
+        small_imgs_exclude = ['']
         if self.args.criteria == "mid":
-            imgs_exclude += ['17_ic_ic_20200810_solder_40.bmp', '17_ic_Sot23_20200820_solder_81.bmp', '5_sod_sod (7).jpg']
-            # pass
+            imgs_exclude += mid_imgs_exclude
+        elif self.args.criteria == "small":
+            # TODO
+            pass
 
         # directory = os.path.expanduser(directory)
         for root, _, files in sorted(os.walk(directory, followlinks=True)):
-            for file in sorted(files):    # 排序
-                box = []
+            for file in sorted(files):  # 排序
+                # box = []
                 if file in imgs_exclude:
                     # These images cause OOM
                     continue
                 if file.endswith(('.jpg', '.png', 'bmp')):
+                    # one image
                     img_path = os.path.join(root, file)
                     anno_path = os.path.join(root, file[:-3] + "txt")
                     if os.path.isfile(anno_path):
+                        # annotation matches the image
                         f = open(anno_path, 'r')
                         lines = f.readlines()
-                        anno = []
+                        cls = list()
+                        anno = list()
                         for line in lines:
                             line = line.strip('\n')
                             line = line.split(' ')
-                            # line = list(map(float, line))
-                            line[0] = str(line[0])
-                            line[1:5] = map(float, line[1:5])
-                            anno.append(line)
+                            # line[0] = str(line[0])
+                            # 因為這裡 line 裡面存了兩種 type (str, float) 所以報錯
+                            # line[1:5] = map(float, line[1:5])
+                            # anno.append(line)
+                            cls.append(str(line[0]))
+                            anno.append(list(map(float, line[1:5])))
 
-                        for i in range(len(anno)):
-                            # TODO: 現在新的資料集，所以這裡要改掉
-                            item = img_path, anno[i][0]
+                        for i in range(len(cls)):
+                            item = img_path, cls[i]
                             images.append(item)
-                            templates.append([anno[i][1], anno[i][2], anno[i][3], anno[i][4]])
-                            box = []
-                            for j in range(len(anno)):
-                                if anno[j][0] == anno[i][0]:
-                                    box.append([anno[j][1], anno[j][2], anno[j][3], anno[j][4]])
+                            templates.append([anno[i][0], anno[i][1], anno[i][2], anno[i][3]])
+                            box = list()
+                            if target == "one":
+                                # 單目標偵測
+                                box.append([anno[i][0], anno[i][1], anno[i][2], anno[i][3]])
+                            elif target == "multi":
+                                # 多目標偵測
+                                for j in range(len(cls)):
+                                    if cls[j] == cls[i]:
+                                        box.append([anno[j][0], anno[j][1], anno[j][2], anno[j][3]])
                             box = np.stack(box).astype(np.float32)
                             searches.append(box)
                     # text 類型
-                    elif os.path.isfile(os.path.join(root, file[:-3] + "label")):
-                        anno_path = os.path.join(root, file[:-3] + "label")
-                        f = open(anno_path, 'r')
-                        img = cv2.imread(img_path)
-                        imh, imw = img.shape[:2]
-                        lines = f.readlines()
-                        anno = []
-                        for line in lines:
-                            line = line.strip('\n')
-                            line = line.split(',')
-                            line = list(line)
-                            anno.append(line)
-                        for i in range(len(anno)):
-                            if (float(anno[i][1]) > 0) and (float(anno[i][2]) > 0):
-                                item = img_path, anno[i][0]
-                                images.append(item)
-                                cx = float(anno[i][1]) + (float(anno[i][3]) - float(anno[i][1])) / 2
-                                cy = float(anno[i][2]) + (float(anno[i][4]) - float(anno[i][2])) / 2
-                                w = float(anno[i][3]) - float(anno[i][1])
-                                h = float(anno[i][4]) - float(anno[i][2])
-                                templates.append([cx/imw, cy/imh, w/imw, h/imh])
-                                box = []
-                                for j in range(len(anno)):
-                                    if anno[j][0] == anno[i][0]:
-                                        cx = float(anno[i][1]) + (float(anno[i][3]) - float(anno[i][1])) / 2
-                                        cy = float(anno[i][2]) + (float(anno[i][4]) - float(anno[i][2])) / 2
-                                        w = float(anno[i][3]) - float(anno[i][1])
-                                        h = float(anno[i][4]) - float(anno[i][2])
-                                        box.append([cx/imw, cy/imh, w/imw, h/imh])
+                    # elif os.path.isfile(os.path.join(root, file[:-3] + "label")):
+                    #     anno_path = os.path.join(root, file[:-3] + "label")
+                    #     f = open(anno_path, 'r')
+                    #     img = cv2.imread(img_path)
+                    #     imh, imw = img.shape[:2]
+                    #     lines = f.readlines()
+                    #     anno = []
+                    #     for line in lines:
+                    #         line = line.strip('\n')
+                    #         line = line.split(',')
+                    #         line = list(line)
+                    #         anno.append(line)
+                    #     for i in range(len(anno)):
+                    #         if (float(anno[i][1]) > 0) and (float(anno[i][2]) > 0):
+                    #             item = img_path, anno[i][0]
+                    #             images.append(item)
+                    #             cx = float(anno[i][1]) + (float(anno[i][3]) - float(anno[i][1])) / 2
+                    #             cy = float(anno[i][2]) + (float(anno[i][4]) - float(anno[i][2])) / 2
+                    #             w = float(anno[i][3]) - float(anno[i][1])
+                    #             h = float(anno[i][4]) - float(anno[i][2])
+                    #             templates.append([cx/imw, cy/imh, w/imw, h/imh])
+                    #             box = []
+                    #             for j in range(len(anno)):
+                    #                 if anno[j][0] == anno[i][0]:
+                    #                     cx = float(anno[i][1]) + (float(anno[i][3]) - float(anno[i][1])) / 2
+                    #                     cy = float(anno[i][2]) + (float(anno[i][4]) - float(anno[i][2])) / 2
+                    #                     w = float(anno[i][3]) - float(anno[i][1])
+                    #                     h = float(anno[i][4]) - float(anno[i][2])
+                    #                     box.append([cx/imw, cy/imh, w/imw, h/imh])
 
-                                box = np.stack(box).astype(np.float32)
-                                searches.append(box)
+                    #             box = np.stack(box).astype(np.float32)
+                    #             searches.append(box)
                     else:
+                        # 影像對應的 annotation 不存在
                         assert False, f"ERROR, no annotation for image: {img_path}"
-
         return images, templates, searches
 
     def _filter_dataset(self, images, templates, searches, criteria):
         # criteria == all
         if criteria == "all":
             return images, templates, searches
-        # for
         inds_match = list()
         for idx, image in enumerate(images):
             # read image
@@ -236,7 +258,7 @@ class PCBDatasetOrigin(Dataset):
         z_box = np.asarray(z_box)
         z_box = z_box[np.newaxis, :]  # [cx, cy, w, h] -> (1, [cx, cy, w, h]) 轉成跟 gt_boxes 一樣是二維的
         gt_boxes = np.asarray(gt_boxes)
-        # center -> corner & ratio -> real
+        # center -> corner | ratio -> real
         z_box = center2corner(z_box)
         z_box = ratio2real(img, z_box)
         gt_boxes = center2corner(gt_boxes)
@@ -247,45 +269,50 @@ class PCBDatasetOrigin(Dataset):
         z_img, r = self.pcb_crop.get_template(x_img, z_box, self.args.bg)
         x_img, gt_boxes, z_box = self.pcb_crop.get_search(x_img, gt_boxes, z_box, r)
 
+        # Augmentation
+        if self.mode == "train":
+            z_img, _ = self.pcb_aug.z_aug(z_img, z_box)
+            x_img, gt_boxes, z_box = self.pcb_aug.x_aug(x_img, gt_boxes, z_box)
+
         # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
         ########################
         # 創 directory
         ########################
-        # dir = f"./image_check/origin/x{cfg.TRAIN.SEARCH_SIZE}_bg{self.args.bg}"
-        # sub_dir = os.path.join(dir, img_name)
-        # create_dir(sub_dir)
+        dir = f"./image_check/origin/x{cfg.TRAIN.SEARCH_SIZE}_bg{self.args.bg}"
+        sub_dir = os.path.join(dir, img_name)
+        create_dir(sub_dir)
 
-        # # sub_dir/origin，裡面存 origin image
-        # origin_dir = os.path.join(sub_dir, "origin")
-        # create_dir(origin_dir)
-        # # sub_dir/template，裡面存 template image
-        # template_dir = os.path.join(sub_dir, "template")
-        # create_dir(template_dir)
-        # # sub_dir/search，裡面存 search image
-        # search_dir = os.path.join(sub_dir, "search")
-        # create_dir(search_dir)
+        # sub_dir/origin，裡面存 origin image
+        origin_dir = os.path.join(sub_dir, "origin")
+        create_dir(origin_dir)
+        # sub_dir/template，裡面存 template image
+        template_dir = os.path.join(sub_dir, "template")
+        create_dir(template_dir)
+        # sub_dir/search，裡面存 search image
+        search_dir = os.path.join(sub_dir, "search")
+        create_dir(search_dir)
 
-        # #########################
-        # # 存圖片
-        # #########################
-        # origin_path = os.path.join(origin_dir, "origin.jpg")
-        # save_image(img, origin_path)
-        # template_path = os.path.join(template_dir, f"{idx}.jpg")
-        # save_image(z_img, template_path)
+        #########################
+        # 存圖片
+        #########################
+        origin_path = os.path.join(origin_dir, "origin.jpg")
+        save_image(img, origin_path)
+        template_path = os.path.join(template_dir, f"{idx}.jpg")
+        save_image(z_img, template_path)
 
-        # # Draw gt_boxes on search image
-        # tmp_gt_boxes = np.asarray(gt_boxes).astype(None).copy()
-        # tmp_gt_boxes[:, 2] = tmp_gt_boxes[:, 2] - tmp_gt_boxes[:, 0]
-        # tmp_gt_boxes[:, 3] = tmp_gt_boxes[:, 3] - tmp_gt_boxes[:, 1]
-        # gt_image = draw_box(x_img, tmp_gt_boxes, type="gt")
-        # # tmp_z_box = np.asarray(z_box).astype(None).copy()
-        # # tmp_z_box[:, 2] = tmp_z_box[:, 2] - tmp_z_box[:, 0]
-        # # tmp_z_box[:, 3] = tmp_z_box[:, 3] - tmp_z_box[:, 1]
-        # # z_gt_image = draw_box(gt_image, tmp_z_box, type="template")
-        # search_path = os.path.join(search_dir, f"{idx}.jpg")
-        # save_image(gt_image, search_path)
+        # Draw gt_boxes on search image
+        tmp_gt_boxes = np.asarray(gt_boxes).astype(None).copy()
+        tmp_gt_boxes[:, 2] = tmp_gt_boxes[:, 2] - tmp_gt_boxes[:, 0]
+        tmp_gt_boxes[:, 3] = tmp_gt_boxes[:, 3] - tmp_gt_boxes[:, 1]
+        gt_image = draw_box(x_img, tmp_gt_boxes, type="gt")
+        tmp_z_box = np.asarray(z_box).astype(None).copy()
+        tmp_z_box[:, 2] = tmp_z_box[:, 2] - tmp_z_box[:, 0]
+        tmp_z_box[:, 3] = tmp_z_box[:, 3] - tmp_z_box[:, 1]
+        z_gt_image = draw_box(gt_image, tmp_z_box, type="template")
+        search_path = os.path.join(search_dir, f"{idx}.jpg")
+        save_image(z_gt_image, search_path)
 
-        # ipdb.set_trace()
+        ipdb.set_trace()
         # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
         col_num = len(gt_boxes)
@@ -295,9 +322,12 @@ class PCBDatasetOrigin(Dataset):
         cls = np.zeros((cfg.TRAIN.OUTPUT_SIZE, cfg.TRAIN.OUTPUT_SIZE), dtype=np.int64)
         cls = torch.as_tensor(cls, dtype=torch.int64)
 
+        # Z-score normalization on z_img, x_img
+        # z_img = z_score_norm(z_img)
+        # x_img = z_score_norm(x_img)
+
         z_img = z_img.transpose((2, 0, 1)).astype(np.float32)
         x_img = x_img.transpose((2, 0, 1)).astype(np.float32)
-
         z_img = torch.as_tensor(z_img, dtype=torch.float32)
         x_img = torch.as_tensor(x_img, dtype=torch.float32)
 

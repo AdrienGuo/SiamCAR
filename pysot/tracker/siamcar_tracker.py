@@ -24,7 +24,7 @@ class SiamCARTracker(SiameseTracker):
         self.window = np.outer(hanning, hanning)
         self.model = model
         # 一定要特別標起來紀念一下 (11/18/2022)
-        # self.model.eval()
+        self.model.eval()
 
     def _convert_cls(self, cls):
         cls = F.softmax(cls[:, :, :, :], dim=1).data[:, 1, :, :].cpu().numpy()
@@ -137,7 +137,7 @@ class SiamCARTracker(SiameseTracker):
         # score_up: (upsize, upsize)
         # coarse_location 完全沒用，score_up 就等於 p_score_up
         # score_up = self.coarse_location(hp_score_up, p_score_up, scale_score, ltrbs)
-        score_up = p_score_up
+        score_up = p_score_up.copy()
 
         boxes = []
         scores = []
@@ -191,15 +191,16 @@ class SiamCARTracker(SiameseTracker):
         hp: dict,
         cls  # (score_h, score_w)
     ):
+        p_score_copy = p_score.copy()
         boxes = []
         scores = []
         # TODO: 這裡可能會錯，應該要全部都找才對吧？
         # 但全部都找的話超慢...
-        for i in range(max(p_score.shape[0], p_score.shape[1])):
-            # 找 p_score 裡面的 maximum 的 (i, j)
+        for i in range(max(p_score_copy.shape[0], p_score_copy.shape[1])):
+            # 找 p_score_copy 裡面的 maximum 的 (i, j)
             # 要注意這裡傳回來的是 “縮小 8 倍“ 的 index (因為不像上面有做 up)
-            max_r, max_c = np.unravel_index(p_score.argmax(), p_score.shape)
-            scores.append(p_score[max_r][max_c])
+            max_r, max_c = np.unravel_index(p_score_copy.argmax(), p_score_copy.shape)
+            scores.append(p_score_copy[max_r][max_c])
             # disp: 將座標軸改以 (x_img_h / 2, x_img_w / 2) 當作 (0, 0)
             disp = self.accurate_location(max_r, max_c)
             # self.scale_z = 1，因為我直接放在 search image 上面
@@ -227,7 +228,7 @@ class SiamCARTracker(SiameseTracker):
             box = [new_cx, new_cy, new_width, new_height]
             boxes.append(box)
 
-            p_score[max_r][max_c] = -1
+            p_score_copy[max_r][max_c] = -1
 
         return boxes, scores
 
@@ -357,9 +358,11 @@ class SiamCARTracker(SiameseTracker):
 
         # 計算 (大小 & 長寬比) 的懲罰量
         penalty = self.cal_penalty(ltrbs, hp['penalty_k'])
-        # 加入 penalty
+        # 選擇不同的 p_score 計算方式
         # p_score = cls * cen * penalty
         p_score = cls * cen
+        # p_score = cls
+        # p_score = cen
 
         hanning_h = np.hanning(self.score_h)
         hanning_w = np.hanning(self.score_w)
@@ -378,8 +381,6 @@ class SiamCARTracker(SiameseTracker):
         cls_up = cv2.resize(cls, (upsize_h, upsize_w), interpolation=cv2.INTER_CUBIC)
         ltrbs = np.transpose(ltrbs, (1, 2, 0))  # ltrbs: (score_h, score_w, 4)
         ltrbs_up = cv2.resize(ltrbs, (upsize_h, upsize_w), interpolation=cv2.INTER_CUBIC)
-
-        # ipdb.set_trace()
 
         scale_score = upsize_h / cfg.TRACK.SCORE_SIZE  # useless
 
@@ -408,7 +409,7 @@ class SiamCARTracker(SiameseTracker):
         # 加 nms，計算所有框
         boxes = []
         top_scores = []
-        iou_threshold = 0.1
+        iou_threshold = 0.01
         results = self.nms(bbox, rescore, iou_threshold)
 
         # 有用圖片的寬高限制預測的範圍
@@ -441,5 +442,8 @@ class SiamCARTracker(SiameseTracker):
             'top_scores': top_scores,
             'pred_boxes': boxes,
             'x_img': x_img,
-            'cls': cls  # for heamap
+            # For heamap
+            'cen': cen,
+            'cls': cls,
+            'score': p_score
         }
