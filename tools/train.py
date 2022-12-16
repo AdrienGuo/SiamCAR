@@ -404,7 +404,7 @@ class SiamCARTrainer(object):
             # Evaluating
             ######################################
             if (epoch + 1) == 1 or (epoch + 1) % cfg.TRAIN.EVAL_FREQ == 0:
-                dummy_model_dir = "./save_models/dummy_model_titan"
+                dummy_model_dir = "./save_models/dummy_model_2080ti"
                 create_dir(dummy_model_dir)
                 dummy_model_name = "dummy_model"
                 dummy_model_path = os.path.join(dummy_model_dir, f"{dummy_model_name}.pth")

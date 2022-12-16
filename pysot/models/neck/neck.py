@@ -25,10 +25,10 @@ class AdjustLayer(nn.Module):
         feature where each feature cell can still capture the entire
         target region.
         """
-        # if x.size(3) < 20:
-        #     l = 4
-        #     r = l + 7
-        #     x = x[:, :, l:r, l:r]
+        if x.size(3) < 20:
+            l = 4
+            r = l + 7
+            x = x[:, :, l:r, l:r]
         return x
 
 
