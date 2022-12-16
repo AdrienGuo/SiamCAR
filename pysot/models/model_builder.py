@@ -11,7 +11,8 @@ import torch.nn.functional as F
 from pysot.core.config import cfg
 from pysot.models.backbone import get_backbone
 from pysot.models.head.car_head import CARHead
-from pysot.models.loss_car_multi import make_siamcar_loss_evaluator
+# from pysot.models.loss_car_multi import make_siamcar_loss_evaluator
+from pysot.models.loss_car_official import make_siamcar_loss_evaluator
 from pysot.models.neck import get_neck
 from pysot.utils.xcorr import xcorr_depthwise
 
@@ -32,7 +33,7 @@ class ModelBuilder(nn.Module):
                                  **cfg.ADJUST.KWARGS)
 
         # build car head
-        self.car_head = CARHead(cfg, 256)
+        self.car_head = CARHead(cfg, cfg.ADJUST.channel)
 
         # build response map
         self.xcorr_depthwise = xcorr_depthwise
@@ -40,7 +41,7 @@ class ModelBuilder(nn.Module):
         # build loss
         self.loss_evaluator = make_siamcar_loss_evaluator(cfg)
 
-        self.down = nn.ConvTranspose2d(256 * 3, 256, 1, 1)
+        self.down = nn.ConvTranspose2d(cfg.ADJUST.channel * 3, cfg.ADJUST.channel, 1, 1)
 
     def template(self, z):
         zf = self.backbone(z)
@@ -104,12 +105,15 @@ class ModelBuilder(nn.Module):
         features = self.down(features)
 
         # Classificaitn, Regression, Centerness
+        # cls: (B, 2, H, W)
+        # loc: (B, 4, H, W)
+        # cen: (B, 1, H, W)
         cls, loc, cen = self.car_head(features)
 
         # 做 meshgrid，需要 x_img 來算出位移。
         # locations: (size_h * size_w, [x, y])
         locations = compute_locations(cls, cfg.TRACK.STRIDE, x_img)
-        # cls: (b, 2, h, w) -> (b, 1, h, w, 2)
+        # cls: (B, 2, H, W) -> (B, 1, H, W, 2)
         cls = self.log_softmax(cls)
 
         # Calculate loss

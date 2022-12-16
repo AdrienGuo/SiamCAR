@@ -2,11 +2,11 @@ import ipdb
 import torch
 
 
-def compute_locations(cls, stride, x_img):
-    h, w = cls.size()[-2:]
+def compute_locations(cls_, stride, x_img):
+    h, w = cls_.size()[-2:]
     x_img_h, x_img_w = x_img.size()[-2:]
     locations_per_level = compute_locations_per_level(
-        h, w, stride, cls.device, x_img_h, x_img_w
+        h, w, stride, cls_.device, x_img_h, x_img_w
     )
     return locations_per_level
 

@@ -5,12 +5,12 @@ import cv2
 import ipdb
 import numpy as np
 
-from pysot.datasets.crop_image import crop_tri
-from pysot.datasets.process import resize, translate
+from pysot.datasets.pcb_crop.crop_image import crop_tri
+from pysot.datasets.utils.process import resize, translate_and_crop
 from pysot.utils.bbox import center2corner, corner2center, ratio2real
 
 
-class PCBCrop(object):
+class PCBCropTriOrigin(object):
     """ This class is used for (tri with origin) dataset.
     """
     def __init__(self, zf_size_min):
@@ -43,3 +43,17 @@ class PCBCrop(object):
     def get_search(self, img, boxes, r):
         img = self._search_crop(img, boxes, r)
         return img
+
+    def get_data(
+        self,
+        z_img,
+        x_img,
+        z_box,
+        gt_boxes,
+        padding=(0, 0, 0)
+    ):
+        # 確保 z_img 的最小邊不會小於 threshold，
+        # 若是 z_img 有做縮放 -> x_img 一樣要做縮放
+        z_img, z_box, r = self.get_template(z_img, z_box)
+        x_img = self.get_search(x_img, gt_boxes, r)
+        return z_img, x_img, z_box

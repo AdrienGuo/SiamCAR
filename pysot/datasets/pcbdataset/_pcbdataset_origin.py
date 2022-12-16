@@ -19,9 +19,9 @@ from torchvision import transforms
 from torchvision.datasets.folder import default_loader
 
 from pysot.core.config import cfg
-from pysot.datasets.pcb_crop.pcb_crop_origin import PCBCrop
+from pysot.datasets.pcb_crop.pcb_crop_origin import PCBCropOrigin
 from pysot.datasets.augmentation.pcb_aug import PCBAug
-from pysot.datasets.process import z_score_norm
+from pysot.datasets.utils.process import z_score_norm
 from pysot.utils.bbox import Center, center2corner, ratio2real
 from pysot.utils.check_image import create_dir, draw_box, save_image
 
@@ -60,8 +60,8 @@ class PCBDatasetOrigin(Dataset):
 
         # zf_size_min: smallest z size after res50 backbone
         zf_size_min = 4
-        # PCBCrop: Crop template & search (preprocess)
-        self.pcb_crop = PCBCrop(zf_size_min)
+        # PCBCropOrigin: Crop template & search (preprocess)
+        self.pcb_crop = PCBCropOrigin(zf_size_min)
 
         # Augmentation
         self.pcb_aug = PCBAug(
@@ -278,41 +278,41 @@ class PCBDatasetOrigin(Dataset):
         ########################
         # 創 directory
         ########################
-        dir = f"./image_check/origin/x{cfg.TRAIN.SEARCH_SIZE}_bg{self.args.bg}"
-        sub_dir = os.path.join(dir, img_name)
-        create_dir(sub_dir)
+        # dir = f"./image_check/origin/x{cfg.TRAIN.SEARCH_SIZE}_bg{self.args.bg}"
+        # sub_dir = os.path.join(dir, img_name)
+        # create_dir(sub_dir)
 
-        # sub_dir/origin，裡面存 origin image
-        origin_dir = os.path.join(sub_dir, "origin")
-        create_dir(origin_dir)
-        # sub_dir/template，裡面存 template image
-        template_dir = os.path.join(sub_dir, "template")
-        create_dir(template_dir)
-        # sub_dir/search，裡面存 search image
-        search_dir = os.path.join(sub_dir, "search")
-        create_dir(search_dir)
+        # # sub_dir/origin，裡面存 origin image
+        # origin_dir = os.path.join(sub_dir, "origin")
+        # create_dir(origin_dir)
+        # # sub_dir/template，裡面存 template image
+        # template_dir = os.path.join(sub_dir, "template")
+        # create_dir(template_dir)
+        # # sub_dir/search，裡面存 search image
+        # search_dir = os.path.join(sub_dir, "search")
+        # create_dir(search_dir)
 
-        #########################
-        # 存圖片
-        #########################
-        origin_path = os.path.join(origin_dir, "origin.jpg")
-        save_image(img, origin_path)
-        template_path = os.path.join(template_dir, f"{idx}.jpg")
-        save_image(z_img, template_path)
+        # #########################
+        # # 存圖片
+        # #########################
+        # origin_path = os.path.join(origin_dir, "origin.jpg")
+        # save_image(img, origin_path)
+        # template_path = os.path.join(template_dir, f"{idx}.jpg")
+        # save_image(z_img, template_path)
 
-        # Draw gt_boxes on search image
-        tmp_gt_boxes = np.asarray(gt_boxes).astype(None).copy()
-        tmp_gt_boxes[:, 2] = tmp_gt_boxes[:, 2] - tmp_gt_boxes[:, 0]
-        tmp_gt_boxes[:, 3] = tmp_gt_boxes[:, 3] - tmp_gt_boxes[:, 1]
-        gt_image = draw_box(x_img, tmp_gt_boxes, type="gt")
-        tmp_z_box = np.asarray(z_box).astype(None).copy()
-        tmp_z_box[:, 2] = tmp_z_box[:, 2] - tmp_z_box[:, 0]
-        tmp_z_box[:, 3] = tmp_z_box[:, 3] - tmp_z_box[:, 1]
-        z_gt_image = draw_box(gt_image, tmp_z_box, type="template")
-        search_path = os.path.join(search_dir, f"{idx}.jpg")
-        save_image(z_gt_image, search_path)
+        # # Draw gt_boxes on search image
+        # tmp_gt_boxes = np.asarray(gt_boxes).astype(None).copy()
+        # tmp_gt_boxes[:, 2] = tmp_gt_boxes[:, 2] - tmp_gt_boxes[:, 0]
+        # tmp_gt_boxes[:, 3] = tmp_gt_boxes[:, 3] - tmp_gt_boxes[:, 1]
+        # gt_image = draw_box(x_img, tmp_gt_boxes, type="gt")
+        # tmp_z_box = np.asarray(z_box).astype(None).copy()
+        # tmp_z_box[:, 2] = tmp_z_box[:, 2] - tmp_z_box[:, 0]
+        # tmp_z_box[:, 3] = tmp_z_box[:, 3] - tmp_z_box[:, 1]
+        # z_gt_image = draw_box(gt_image, tmp_z_box, type="template")
+        # search_path = os.path.join(search_dir, f"{idx}.jpg")
+        # save_image(z_gt_image, search_path)
 
-        ipdb.set_trace()
+        # ipdb.set_trace()
         # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
         col_num = len(gt_boxes)

@@ -3,10 +3,8 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
 import argparse
-import math
 import os
 import re
-import shutil
 import sys
 
 import colorama

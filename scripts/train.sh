@@ -6,9 +6,9 @@ ENDCOLOR="\e[0m"
 
 
 dataset="all"
-criteria="all"  # big / mid / small
+criteria="all"  # all / big / mid / small
 target="multi"  # one / multi
-method="origin"  # origin / search
+method="origin"  # origin / search / official
 neg=(0.0)
 bg="1.0"  # 使用多少 background
 epoch=(200)
@@ -28,7 +28,6 @@ echo -e "Batch: ${GREEN}${batch_size}${ENDCOLOR}"
 echo -e "Accum Iters: ${GREEN}${accum_iters}${ENDCOLOR}"
 echo -e "${GREEN}- Check your NECK crop${ENDCOLOR}"
 echo -e "${GREEN}- Check your Learning Rate${ENDCOLOR}"
-echo -e "${GREEN}- Check where PCBDataset import from${ENDCOLOR}"
 sleep 3
 
 

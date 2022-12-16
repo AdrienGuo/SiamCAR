@@ -1,4 +1,8 @@
-# Copyright (c) SenseTime. All Rights Reserved.
+# 這是專門給 PatternMatch_test 資料集的。
+# 只會用在 test，
+# 因為 PatternMatch_test 沒有標籤
+
+
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
@@ -13,11 +17,11 @@ import cv2
 import ipdb
 import numpy as np
 import torch
-from pysot.core.config import cfg
-from pysot.datasets.pcb_crop.pcb_crop_tri_origin import PCBCrop
-from pysot.utils.bbox import Center, Corner, center2corner
-from pysot.utils.check_image import create_dir, draw_box, save_image
 from torchvision import transforms
+
+from pysot.core.config import cfg
+from pysot.datasets.pcb_crop import get_pcb_crop
+from pysot.utils.check_image import create_dir, save_image
 
 logger = logging.getLogger("global")
 
@@ -28,13 +32,15 @@ if pyv[0] == '3':
     cv2.ocl.setUseOpenCL(False)
 
 
-class PCBDatasetTriOrigin():
+class PCBDatasetTri():
     """ 定義代號
-        x: template
-        z: search
+        z: template
+        x: search
     """
-    def __init__(self, args, mode) -> None:
-        super(PCBDatasetTriOrigin, self).__init__()
+    def __init__(self, args, mode="test") -> None:
+        super(PCBDatasetTri, self).__init__()
+
+        self.args = args
 
         self.root = args.test_dataset
         images, templates, searches = self._make_dataset(self.root)
@@ -45,11 +51,13 @@ class PCBDatasetTriOrigin():
         self.templates = templates
         self.searches = searches
 
-        # zf_size_min: smallest z size after res50 backbone
-        zf_size_min = 4
-        # PCBCrop: Crop template & search (preprocess)
-        self.pcb_crop = PCBCrop(zf_size_min)
-
+        pcb_crop = get_pcb_crop(args.method)
+        if args.method == "tri_origin":
+            # zf_size_min: smallest z size after res50 backbone
+            zf_size_min = 4
+            self.pcb_crop = pcb_crop(zf_size_min)
+        else:
+            assert False, "ERROR, method is wrong"
 
     def _make_dataset(self, dir_path):
         """
@@ -118,9 +126,27 @@ class PCBDatasetTriOrigin():
     def __len__(self):
         return len(self.images)
 
-    def __getitem__(self, idx):
-        logger.debug("__getitem__")
+    def save_img(self, img_path, z_img, x_img, idx):
+        # 創 directory
+        dir = f"./image_check/{self.args.method}/x{cfg.TRACK.INSTANCE_SIZE}"
+        img_name = img_path.split('/')[-1]
+        # 以 “圖片名稱” 當作 sub_dir 的名稱
+        sub_dir = os.path.join(dir, img_name)
+        create_dir(sub_dir)
+        # 創 sub_dir/search，裡面存 search image
+        search_dir = os.path.join(sub_dir, "search")
+        create_dir(search_dir)
+        # 創 sub_dir/template，裡面存 template image
+        template_dir = os.path.join(sub_dir, "template")
+        create_dir(template_dir)
 
+        # 存圖片
+        template_path = os.path.join(template_dir, f"{idx}.jpg")
+        save_image(z_img, template_path)
+        search_path = os.path.join(search_dir, f"{idx}.jpg")
+        save_image(x_img, search_path)
+
+    def __getitem__(self, idx):
         img_path = self.images[idx]
         template = self.templates[idx]
         search = self.searches[idx]
@@ -130,7 +156,6 @@ class PCBDatasetTriOrigin():
         # Get template and search images (raw data)
         ##########################################
         img_name = img_path.split('/')[-1]
-        # print(f"Load image from: {img_path}")
 
         z_img = cv2.imread(template)
         x_img = cv2.imread(search)
@@ -143,41 +168,15 @@ class PCBDatasetTriOrigin():
 
         ##########################################
         # Step 2.
-        # Crop the template and search images
+        # Crop the template and search images.
         ##########################################
-        # 確保 z_img 的最小邊不會小於 threshold，
-        # 若是 z_img 有做縮放 -> x_img 一樣要做縮放
-        z_img, z_box, r = self.pcb_crop.get_template(z_img, z_box)
-        x_img = self.pcb_crop.get_search(x_img, gt_boxes, r)
+        padding = (0, 0, 0)
+        z_img, x_img, z_box = self.pcb_crop.get_data(
+            z_img, x_img, z_box, gt_boxes, padding=padding
+        )
 
-        # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-        ########################
-        # 創 directory
-        ########################
-        # dir = f"./image_check/test/x{cfg.TRACK.INSTANCE_SIZE}"
-        # img_name = img_path.split('/')[-1]
-
-        # # 以 “圖片名稱” 當作 sub_dir 的名稱
-        # sub_dir = os.path.join(dir, img_name)
-        # create_dir(sub_dir)
-
-        # # 創 sub_dir/search，裡面存 search image
-        # search_dir = os.path.join(sub_dir, "search")
-        # create_dir(search_dir)
-        # # 創 sub_dir/template，裡面存 template image
-        # template_dir = os.path.join(sub_dir, "template")
-        # create_dir(template_dir)
-
-        # #########################
-        # # 存圖片
-        # #########################
-        # template_path = os.path.join(template_dir, f"{idx}.jpg")
-        # save_image(z_img, template_path)
-        # search_path = os.path.join(search_dir, f"{idx}.jpg")
-        # save_image(x_img, search_path)
-
-        # ipdb.set_trace()
-        # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+        self.save_img(img_path, z_img, x_img, idx)
+        ipdb.set_trace()
 
         ##########################################
         # Step 3.
@@ -198,18 +197,5 @@ class PCBDatasetTriOrigin():
         cls = np.zeros((cfg.TRAIN.OUTPUT_SIZE, cfg.TRAIN.OUTPUT_SIZE), dtype=np.int64)
         cls = torch.as_tensor(cls, dtype=torch.int64)
 
+        r = 0
         return img_name, img_path, z_img, x_img, cls, box, z_box, r
-
-        return {
-            'img_path': search,
-            'img_name': img_name,
-            'z_box': z_box,
-            'z_img': z_img,
-            'x_img': x_img,
-
-            'gt_boxes': gt_boxes,    # useless
-            'scale': r,    # useless
-            'spatium': 0,    # useless
-            # === 下面是檢查 anchor 的時候，要存檔用的 ===
-            'idx': idx,
-        }

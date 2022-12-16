@@ -17,7 +17,7 @@ from PIL import Image
 from pysot.core.config import cfg
 from pysot.datasets.augmentation.augmentation import Augmentation
 from pysot.datasets.image_crop import crop, resize
-from pysot.datasets.pcb_crop.pcb_crop_search import PCBCrop
+from pysot.datasets.pcb_crop.pcb_crop_search import PCBCropSearch
 from pysot.utils.bbox import Center, center2corner, ratio2real
 from pysot.utils.check_image import create_dir, draw_box, save_image
 from torch.utils.data import Dataset
@@ -60,7 +60,7 @@ class PCBDatasetSearch(Dataset):
         self.searches = searches
 
         # crop template & search (preprocess)
-        self.pcb_crop = PCBCrop(
+        self.pcb_crop = PCBCropSearch(
             template_size=cfg.TRAIN.EXEMPLAR_SIZE,
             search_size=cfg.TRAIN.SEARCH_SIZE,
         )
