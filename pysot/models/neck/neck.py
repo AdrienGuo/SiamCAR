@@ -1,5 +1,4 @@
 # Copyright (c) SenseTime. All Rights Reserved.
-# depthwise 從7x7改15x15
 
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)

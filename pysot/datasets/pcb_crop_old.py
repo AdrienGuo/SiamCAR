@@ -5,8 +5,8 @@ import cv2
 import ipdb
 import numpy as np
 from pysot.core.config import cfg
-from pysot.datasets.crop_image import crop_like_SiamFC
-from pysot.datasets.process import resize, translate
+from pysot.datasets.pcb_crop.crop import crop_like_SiamFC
+from pysot.datasets.utils.process import resize, translate_and_crop
 from pysot.utils.bbox import center2corner, corner2center, ratio2real
 
 
@@ -33,15 +33,15 @@ class PCBCrop:
             else:
                 r = self.x_size / img_h
             x_img, gt_boxes = resize(img, gt_boxes, r)
-            x_img, gt_boxes, spatium = translate(x_img, gt_boxes, self.x_size, padding)
+            x_img, gt_boxes, spatium = translate_and_crop(x_img, gt_boxes, self.x_size, padding)
             z_img, z_box = resize(img, z_box, r)
-            _, z_box, _ = translate(z_img, z_box, self.x_size, padding)
+            _, z_box, _ = translate_and_crop(z_img, z_box, self.x_size, padding)
         # 原圖縮放後小於 search size，則直接做 r 的縮放
         else:
             x_img, gt_boxes = resize(img, gt_boxes, r)
-            x_img, gt_boxes, spatium = translate(x_img, gt_boxes, self.x_size, padding)
+            x_img, gt_boxes, spatium = translate_and_crop(x_img, gt_boxes, self.x_size, padding)
             z_img, z_box = resize(img, z_box, r)
-            _, z_box, _ = translate(z_img, z_box, self.x_size, padding)
+            _, z_box, _ = translate_and_crop(z_img, z_box, self.x_size, padding)
 
         return x_img, gt_boxes, z_box, r, spatium
 

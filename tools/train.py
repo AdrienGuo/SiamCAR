@@ -26,7 +26,7 @@ import wandb
 from pysot.core.config import cfg
 from pysot.datasets.collate import collate_fn
 # 選擇 new / origin 的裁切方式
-# from pysot.datasets.pcbdataset.pcbdataset_origin import PCBDataset
+# from pysot.datasets.pcbdataset.pcbdataset import PCBDataset
 from pysot.datasets.pcbdataset import get_pcbdataset
 from pysot.models.model_builder import ModelBuilder
 from pysot.tracker.siamcar_tracker import SiamCARTracker
@@ -93,9 +93,9 @@ class SiamCARTrainer(object):
             # self.tb_writer = SummaryWriter(cfg.TRAIN.LOG_DIR)
         else:
             self.tb_writer = None
-         
+
         self.stop_training = False
-        
+
     def _seed_torch(self, seed=0):
         random.seed(seed)
         os.environ['PYTHONHASHSEED'] = str(seed)
@@ -107,11 +107,10 @@ class SiamCARTrainer(object):
 
     def CreateDatasets(self, validation_split: float = 0.0, random_seed: int = 42):
         logger.info("Building dataset...")
-        # 改成這樣真的滿強的，就不用再手動改
-        pcbdataset = get_pcbdataset(args.method)
+        pcb_dataset = get_pcbdataset(args.method)
         # 現在 neg = 0，所以 train_dataset 可以沿用
-        dataset = pcbdataset(args, "train")
-        test_dataset = pcbdataset(args, "test")
+        dataset = pcb_dataset(args, "train")
+        test_dataset = pcb_dataset(args, "test")
 
         dataset_size = len(dataset)
         indices = list(range(dataset_size))
@@ -139,8 +138,8 @@ class SiamCARTrainer(object):
 
         self.train_loader = create_loader(train_dataset, args.batch_size, cfg.TRAIN.NUM_WORKERS)
         self.train_eval_loader = create_loader(train_dataset, batch_size=1, num_workers=8)
-        self.val_loader = create_loader(val_dataset, args.batch_size, cfg.TRAIN.NUM_WORKERS)
-        self.val_eval_loader = create_loader(val_dataset, batch_size=1, num_workers=8)
+        # self.val_loader = create_loader(val_dataset, args.batch_size, cfg.TRAIN.NUM_WORKERS)
+        # self.val_eval_loader = create_loader(val_dataset, batch_size=1, num_workers=8)
         self.test_loader = create_loader(test_dataset, args.batch_size, cfg.TRAIN.NUM_WORKERS)
         self.test_eval_loader = create_loader(test_dataset, batch_size=1, num_workers=8)
 
@@ -242,6 +241,7 @@ class SiamCARTrainer(object):
             'Train Dataset Size': len(self.train_loader.dataset),
             'Test Dataset Size': len(self.test_loader.dataset),
             'Validation Ratio': cfg.DATASET.VALIDATION_SPLIT,
+            'Method': args.method,
             'Negative Ratio': args.neg,
             'Background': args.bg,
             'Epochs': args.epoch,
@@ -259,12 +259,12 @@ class SiamCARTrainer(object):
             'Alpha (Focal Loss)': cfg.TRAIN.LOSS_ALPHA,
             'Gamma (Focal Loss)': cfg.TRAIN.LOSS_GAMMA,
         }
-        # wandb.init(
-        #     project="SiamCAR",
-        #     entity="adrien88",
-        #     name=model_name,
-        #     config=constants
-        # )
+        wandb.init(
+            project="SiamCAR",
+            entity="adrien88",
+            name=model_name,
+            config=constants
+        )
 
         cur_lr = self.lr_scheduler.get_cur_lr()
         rank = get_rank()
@@ -282,7 +282,7 @@ class SiamCARTrainer(object):
         if get_rank() == 0:
             create_dir(cfg.TRAIN.MODEL_DIR)
 
-        print("Start tarining!")
+        print("Start training!")
         for epoch in range(cfg.TRAIN.START_EPOCH, args.epoch):
             # one epoch
             logger.info(f"Epoch: {epoch + 1}")
@@ -503,7 +503,7 @@ if __name__ == '__main__':
     cfg.merge_from_file(args.cfg)
 
     # PermissionError
-    os.environ['WANDB_DIR'] = './wandb'
+    os.environ['WANDB_DIR'] = './wandb_titan'
 
     Trainer = SiamCARTrainer()
     # Trainer.SetTrainingCallback()

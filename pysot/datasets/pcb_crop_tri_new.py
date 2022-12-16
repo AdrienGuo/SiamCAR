@@ -5,8 +5,8 @@ import cv2
 import ipdb
 import numpy as np
 from pysot.core.config import cfg
-from pysot.datasets.crop_image import crop_tri
-from pysot.datasets.process import resize, translate
+from pysot.datasets.pcb_crop.crop import crop_tri
+from pysot.datasets.utils.process import resize, translate_and_crop
 from pysot.utils.bbox import center2corner, corner2center, ratio2real
 
 
@@ -17,7 +17,7 @@ class PCBCrop:
 
     def _template_crop(self, img, box, r, padding=(0, 0, 0)):
         img, box = resize(img, box, r)
-        img, box, _ = translate(img, box, self.z_size, padding)
+        img, box, _ = translate_and_crop(img, box, self.z_size, padding)
         return img, box
 
     def _search_crop(self, img, boxes, padding=(0, 0, 0)):
@@ -26,7 +26,7 @@ class PCBCrop:
         r = self.x_size / long_side
 
         img, boxes = resize(img, boxes, r)
-        img, _, _ = translate(img, boxes, self.x_size, padding)
+        img, _, _ = translate_and_crop(img, boxes, self.x_size, padding)
 
         return img, r
 

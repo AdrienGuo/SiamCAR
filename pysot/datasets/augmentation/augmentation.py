@@ -65,39 +65,63 @@ class Augmentation:
         return image
 
     def _shift_scale_aug(self, image, bbox, crop_bbox, size):
+        """
+        Args:
+            z:
+                image: (511, 511, 3)
+                bbox: ground truth
+                crop_bbox ([x1, y1, x2, y2]): [192, 192, 318, 318]
+                size: 127
+            x:
+                image: (511, 511, 3)
+                bbox: ground truth
+                crop_bbox ([x1, y1, x2, y2]): [128, 128, 383, 383]
+                size: 255
+        """
+        # im_h, im_w = 511, 511
         im_h, im_w = image.shape[:2]
 
         # adjust crop bounding box
+        # crop_bbox_center: [cx, cy, w, h]
         crop_bbox_center = corner2center(crop_bbox)
         if self.scale:
+            # 這裡就單純對影像做縮放
             scale_x = (1.0 + Augmentation.random() * self.scale)
             scale_y = (1.0 + Augmentation.random() * self.scale)
             h, w = crop_bbox_center.h, crop_bbox_center.w
             scale_x = min(scale_x, float(im_w) / w)
             scale_y = min(scale_y, float(im_h) / h)
+            # crop_bbox_center: [cx, cy, w', h']
             crop_bbox_center = Center(crop_bbox_center.x,
                                       crop_bbox_center.y,
                                       crop_bbox_center.w * scale_x,
                                       crop_bbox_center.h * scale_y)
 
+        # crop_bbox: [x1, y1, x2, y2]
         crop_bbox = center2corner(crop_bbox_center)
         if self.shift:
+            # self.shift (z: 4, x: 64)
+            # shift 在做的事情是把 crop_bbox 做平移，範圍就是給定的 self.shift。
+            # sx, sy: -64~64
             sx = Augmentation.random() * self.shift
             sy = Augmentation.random() * self.shift
 
             x1, y1, x2, y2 = crop_bbox
 
+            # 這兩行其實沒啥用，可以不用寫...
             sx = max(-x1, min(im_w - 1 - x2, sx))
             sy = max(-y1, min(im_h - 1 - y2, sy))
 
             crop_bbox = Corner(x1 + sx, y1 + sy, x2 + sx, y2 + sy)
 
         # adjust target bounding box
+        # 因為 crop_bbox 的範圍被調整了，所以 bbox (ground truth) 的座標也要修正。
         x1, y1 = crop_bbox.x1, crop_bbox.y1
         bbox = Corner(bbox.x1 - x1, bbox.y1 - y1,
                       bbox.x2 - x1, bbox.y2 - y1)
 
         if self.scale:
+            # 一樣要調整 bbox 的大小。
             bbox = Corner(bbox.x1 / scale_x, bbox.y1 / scale_y,
                           bbox.x2 / scale_x, bbox.y2 / scale_y)
 
@@ -130,6 +154,7 @@ class Augmentation:
 
     def __call__(self, image, bbox, size=None, gray=False):
         shape = image.shape
+        # crop_bbox: (0, 0, 126, 126)
         # crop_bbox = center2corner(Center(shape[0]//2, shape[1]//2,
         #                                  size-1, size-1))
         # gray augmentation

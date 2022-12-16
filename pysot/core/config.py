@@ -101,29 +101,18 @@ __C.DATASET.VALIDATION_SPLIT = 0.0
 # Augmentation
 # for template
 __C.DATASET.TEMPLATE = CN()
-
 # for detail discussion
-__C.DATASET.TEMPLATE.SHIFT = 0.0  # 4
-
+__C.DATASET.TEMPLATE.SHIFT = 0  # 4
 __C.DATASET.TEMPLATE.SCALE = 0.0  # 0.05
-
 __C.DATASET.TEMPLATE.BLUR = 0.0
-
 __C.DATASET.TEMPLATE.FLIP = 0.0
-
 __C.DATASET.TEMPLATE.COLOR = 0.0  # 1.0
 
 __C.DATASET.SEARCH = CN()
-
-__C.DATASET.SEARCH.SHIFT = 0.0  # 64
-
-__C.DATASET.SEARCH.SCALE =0.0  # 0.18
-# __C.DATASET.SEARCH.SCALE = 0
-
+__C.DATASET.SEARCH.SHIFT = 64  # 64
+__C.DATASET.SEARCH.SCALE = 0.0  # 0.18
 __C.DATASET.SEARCH.BLUR = 0.0
-
 __C.DATASET.SEARCH.FLIP = 0.0
-
 __C.DATASET.SEARCH.COLOR = 0.0  # 1.0
 
 # for detail discussion
@@ -176,6 +165,9 @@ __C.ADJUST.KWARGS = CN(new_allowed=True)
 
 # Adjust layer type
 __C.ADJUST.TYPE = "AdjustAllLayer"
+
+# Adjust channel
+__C.ADJUST.channel = 256  # 256
 
 # ------------------------------------------------------------------------ #
 # RPN options

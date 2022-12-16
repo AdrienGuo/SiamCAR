@@ -1,5 +1,6 @@
-# Copyright (c) SenseTime. All Rights Reserved.
-# 一張影像依類別分開 有Text
+# 這是用在除了 PatternMatch_test 以外的資料集。
+# trian, test 都會用
+
 
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
@@ -13,18 +14,16 @@ import cv2
 import ipdb
 import numpy as np
 import torch
-from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
 from torchvision.datasets.folder import default_loader
 
 from pysot.core.config import cfg
-from pysot.datasets.pcb_crop.pcb_crop_origin import PCBCrop
+from pysot.datasets.augmentation.augmentation import Augmentation
 from pysot.datasets.augmentation.pcb_aug import PCBAug
-from pysot.datasets.process import z_score_norm
+from pysot.datasets.pcb_crop import get_pcb_crop
 from pysot.utils.bbox import Center, center2corner, ratio2real
 from pysot.utils.check_image import create_dir, draw_box, save_image
-
 
 Corner = namedtuple('Corner', 'x1 y1 x2 y2')
 logger = logging.getLogger("global")
@@ -35,33 +34,52 @@ if pyv[0] == '3':
     cv2.ocl.setUseOpenCL(False)
 
     
-class PCBDatasetOrigin(Dataset):
-    def __init__(self, args, mode: str, loader = default_loader):
-        """ 代號
-            z: template
-            x: search
-        Args:
-            mode: train / test
-        """
+class PCBDataset(Dataset):
+    """ 代號
+        z: template
+        x: search
+
+    Args:
+        mode: train / test
+    """
+
+    def __init__(self, args, mode: str):
         self.args = args
 
         self.mode = mode
-        if mode == "test":
-            self.dataset_dir = args.test_dataset
-        else:
-            self.dataset_dir = args.dataset
-        images, templates, searches = self._make_dataset(self.dataset_dir, args.target)
+        if mode == "test": self.dataset_dir = args.test_dataset
+        else: self.dataset_dir = args.dataset
+        images, templates, searches = self._make_dataset(
+            self.dataset_dir, args.target)
         images, templates, searches = self._filter_dataset(
             images, templates, searches, args.criteria)
-        assert len(images) != 0, "ERROR, dataset is empty"
         self.images = images
         self.templates = templates
         self.searches = searches
 
-        # zf_size_min: smallest z size after res50 backbone
-        zf_size_min = 4
-        # PCBCrop: Crop template & search (preprocess)
-        self.pcb_crop = PCBCrop(zf_size_min)
+        # Several crop methods
+        pcb_crop = get_pcb_crop(args.method)
+        if args.method == "official":
+            self.pcb_crop = pcb_crop(
+                template_size=cfg.TRAIN.EXEMPLAR_SIZE,
+                search_size=cfg.TRAIN.SEARCH_SIZE,
+                shift=cfg.DATASET.SEARCH.SHIFT
+            )
+        elif args.method == "search":
+            self.pcb_crop = pcb_crop(
+                template_size=cfg.TRAIN.EXEMPLAR_SIZE,
+                search_size=cfg.TRAIN.SEARCH_SIZE,
+                background=args.bg
+            )
+        elif args.method == "origin":
+            # zf_size_min: smallest z size after res50 backbone
+            zf_size_min = 4
+            self.pcb_crop = pcb_crop(
+                zf_size_min,
+                background=args.bg
+            )
+        else:
+            assert False, "ERROR, method is wrong"
 
         # Augmentation
         self.pcb_aug = PCBAug(
@@ -107,10 +125,7 @@ class PCBDatasetOrigin(Dataset):
                         for line in lines:
                             line = line.strip('\n')
                             line = line.split(' ')
-                            # line[0] = str(line[0])
-                            # 因為這裡 line 裡面存了兩種 type (str, float) 所以報錯
-                            # line[1:5] = map(float, line[1:5])
-                            # anno.append(line)
+                            # line 要轉成兩種 type (str, float)，要分開處理
                             cls.append(str(line[0]))
                             anno.append(list(map(float, line[1:5])))
 
@@ -199,13 +214,12 @@ class PCBDatasetOrigin(Dataset):
         images = [images[i] for i in inds_match]
         templates = [templates[i] for i in inds_match]
         searches = [searches[i] for i in inds_match]
-
         return images, templates, searches
 
     def _get_image_anno(self, idx, data):
-        img_path, img_cls = self.images[idx]
-        box_anno = data[idx]
-        return img_path, box_anno, img_cls
+        img_path, template_cls = self.images[idx]
+        image_anno = data[idx]
+        return img_path, image_anno
 
     def _get_positive_pair(self, idx):
         return self._get_image_anno(idx, self.templates), \
@@ -219,69 +233,15 @@ class PCBDatasetOrigin(Dataset):
                 break
         return self._get_image_anno(idx, self.templates), \
                self._get_image_anno(idx_neg, self.searches)
-    
+
     def __len__(self) -> int:
         return len(self.images)
 
-    def __getitem__(self, idx):
-        gray = cfg.DATASET.GRAY and cfg.DATASET.GRAY > np.random.random()
-
-        # 加入 neg 的原因要去看 [DaSiamRPN](https://arxiv.org/pdf/1808.06048)
-        neg = cfg.DATASET.NEG and self.args.neg > np.random.random()
-
-        # Get dataset.
-        if neg:
-            template, search = self._get_negative_pair(idx)
-        else:
-            template, search = self._get_positive_pair(idx)
-
-        # Get image.
-        assert template[0] == search[0], f"ERROR, should be the same if neg is False"
-        img_path = template[0]
-        img_name = img_path.split('/')[-1].rsplit('.', 1)[0]
-        img = cv2.imread(img_path)
-        assert img is not None, f"Error image: {template[0]}"
-        z_img = img
-        x_img = img
-
-        # img_cls = template[2]
-        # assert isinstance(img_cls, str), f"Error, class should be string"
-        # if template_image is None:
-        #     print('error image:',template[0])
-
-        ##########################################
-        # Crop the template & search image.
-        ##########################################
-        z_box = template[1].copy()
-        gt_boxes = search[1].copy()  # gt_boxes: (num, [cx, cy, w, y]) #ratio
-
-        z_box = np.asarray(z_box)
-        z_box = z_box[np.newaxis, :]  # [cx, cy, w, h] -> (1, [cx, cy, w, h]) 轉成跟 gt_boxes 一樣是二維的
-        gt_boxes = np.asarray(gt_boxes)
-        # center -> corner | ratio -> real
-        z_box = center2corner(z_box)
-        z_box = ratio2real(img, z_box)
-        gt_boxes = center2corner(gt_boxes)
-        gt_boxes = ratio2real(img, gt_boxes)
-
-        # z_box: (1, [x1, y1, x2, y2])
-        # gt_boxes: (num, [x1, y1, x2, y2])
-        z_img, r = self.pcb_crop.get_template(x_img, z_box, self.args.bg)
-        x_img, gt_boxes, z_box = self.pcb_crop.get_search(x_img, gt_boxes, z_box, r)
-
-        # Augmentation
-        if self.mode == "train":
-            z_img, _ = self.pcb_aug.z_aug(z_img, z_box)
-            x_img, gt_boxes, z_box = self.pcb_aug.x_aug(x_img, gt_boxes, z_box)
-
-        # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-        ########################
+    def save_img(self, img_name, img, z_img, x_img, z_box, gt_boxes, idx):
         # 創 directory
-        ########################
-        dir = f"./image_check/origin/x{cfg.TRAIN.SEARCH_SIZE}_bg{self.args.bg}"
+        dir = f"./image_check/{self.args.method}/x{cfg.TRAIN.SEARCH_SIZE}"
         sub_dir = os.path.join(dir, img_name)
         create_dir(sub_dir)
-
         # sub_dir/origin，裡面存 origin image
         origin_dir = os.path.join(sub_dir, "origin")
         create_dir(origin_dir)
@@ -292,14 +252,11 @@ class PCBDatasetOrigin(Dataset):
         search_dir = os.path.join(sub_dir, "search")
         create_dir(search_dir)
 
-        #########################
         # 存圖片
-        #########################
         origin_path = os.path.join(origin_dir, "origin.jpg")
         save_image(img, origin_path)
         template_path = os.path.join(template_dir, f"{idx}.jpg")
         save_image(z_img, template_path)
-
         # Draw gt_boxes on search image
         tmp_gt_boxes = np.asarray(gt_boxes).astype(None).copy()
         tmp_gt_boxes[:, 2] = tmp_gt_boxes[:, 2] - tmp_gt_boxes[:, 0]
@@ -312,40 +269,75 @@ class PCBDatasetOrigin(Dataset):
         search_path = os.path.join(search_dir, f"{idx}.jpg")
         save_image(z_gt_image, search_path)
 
-        ipdb.set_trace()
-        # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    def __getitem__(self, idx):
+        gray = cfg.DATASET.GRAY and cfg.DATASET.GRAY > np.random.random()
 
+        # 加入 neg 的原因要去看 [DaSiamRPN](https://arxiv.org/pdf/1808.06048)
+        neg = cfg.DATASET.NEG and self.args.neg > np.random.random()
+        # Get dataset.
+        if not neg:
+            template, search = self._get_positive_pair(idx)
+        else:
+            template, search = self._get_negative_pair(idx)
+
+        # Get image.
+        assert template[0] == search[0], f"ERROR, should be the same if neg is False"
+        img_path = template[0]
+        img_name = img_path.split('/')[-1].rsplit('.', 1)[0]
+        img = cv2.imread(img_path)
+        assert img is not None, f"Error image: {template[0]}"
+
+        # img_cls = template[2]
+        # assert isinstance(img_cls, str), f"Error, class should be string"
+
+        ##########################################
+        # Crop the template & search image.
+        ##########################################
+        # TODO: 改成我的寫法，希望沒問題🙏
+        z_box = template[1].copy()  # z_box: [cx, cy, w, h]
+        gt_boxes = search[1].copy()  # gt_boxes: (num, [cx, cy, w, y]) #ratio
+
+        z_box = np.asarray(z_box)
+        gt_boxes = np.asarray(gt_boxes)
+        # [cx, cy, w, h] -> (1, [cx, cy, w, h]) 轉成二維的
+        z_box = z_box[np.newaxis, :]
+        # center -> corner | ratio -> real
+        z_box = center2corner(z_box)
+        z_box = ratio2real(img, z_box)
+        gt_boxes = center2corner(gt_boxes)
+        gt_boxes = ratio2real(img, gt_boxes)
+
+        padding = (0, 0, 0)
+        # z_box: (1, [x1, y1, x2, y2])
+        # gt_boxes: (num, [x1, y1, x2, y2])
+        z_img, x_img, z_box, gt_boxes = self.pcb_crop.get_data(
+            img, z_box, gt_boxes, padding
+        )
+
+        # Augmentation
+        if self.mode == "train":
+            z_img, _ = self.pcb_aug.z_aug(z_img, z_box)
+            x_img, gt_boxes, z_box = self.pcb_aug.x_aug(x_img, gt_boxes, z_box)
+
+        # self.save_img(img_name, img, z_img, x_img, z_box, gt_boxes, idx)
+        # ipdb.set_trace()
+
+        # Add one all zeros column to gt_boxes
         col_num = len(gt_boxes)
-        gt_boxes = np.c_[np.zeros(col_num), gt_boxes]  # Add a all zeros column to gt_boxes
+        gt_boxes = np.c_[np.zeros(col_num), gt_boxes]
         gt_boxes = torch.as_tensor(gt_boxes, dtype=torch.int64)
 
         cls = np.zeros((cfg.TRAIN.OUTPUT_SIZE, cfg.TRAIN.OUTPUT_SIZE), dtype=np.int64)
         cls = torch.as_tensor(cls, dtype=torch.int64)
-
-        # Z-score normalization on z_img, x_img
-        # z_img = z_score_norm(z_img)
-        # x_img = z_score_norm(x_img)
 
         z_img = z_img.transpose((2, 0, 1)).astype(np.float32)
         x_img = x_img.transpose((2, 0, 1)).astype(np.float32)
         z_img = torch.as_tensor(z_img, dtype=torch.float32)
         x_img = torch.as_tensor(x_img, dtype=torch.float32)
 
-        # 小於 15 的卷積後會變成 0
-        assert z_img.size(1) >= 15, f"ERROR, should > 15, but got {z_img.size(1)}"
-        assert z_img.size(2) >= 15, f"ERROR, should > 15, but got {z_img.size(2)}"
-
+        # img_path: "./datasets/train/img_name.bmp"
         # cls: (size, size) 都是 0
-        # box: (n, 5: [0, x1, y1, x2, y2])
-        # z_box: Corner(x1, y1, x2, y2)
+        # box: (n, 5:[0, x1, y1, x2, y2])
+        # z_box: (1, 4:[x1, y1, x2, y2])
+        r = 0
         return img_name, img_path, z_img, x_img, cls, gt_boxes, z_box, r
-        return {
-            'img_name': img_name,
-            'img_path': img_path,
-            'z_img': z_img,
-            'z_box': z_box,
-            'z_cls': template[2],
-            'x_img': x_img,
-            'gt_boxes': gt_boxes,
-            'cls': cls,
-        }

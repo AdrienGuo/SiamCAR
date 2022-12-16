@@ -10,7 +10,7 @@ loss_method="bce"  # bce / focal
 train_dataset="all"  # all
 train_criteria="mid"  # big / mid / small
 train_target="one"  # one / multi
-train_method="origin"  # origin / search
+train_method="origin"  # origin / search / official
 neg=(0.0)  # 負樣本的比率
 size=(255)
 bg="1.0"  # 使用多少 background
@@ -21,7 +21,7 @@ ckpt=(1)
 # Test Info
 part="test"  # train / test
 test_dataset="PatternMatch_test"  # all / PatternMatch_test
-criteria="small"  # all / big / mid / small
+criteria="all"  # all / big / mid / small
 target="multi"  # one / multi
 method="tri_origin"  # origin / tri_origin / search
 

@@ -3,11 +3,11 @@ This file contains specific functions for computing losses of SiamCAR
 file
 """
 
-import torch
-from torch import nn
+import ipdb
 import numpy as np
+import torch
 import torch.nn.functional as F
-
+from torch import nn
 
 INF = 100000000
 
@@ -99,16 +99,17 @@ class SiamCARLossComputation(object):
         bboxes = gt_bbox
         labels = labels.view(self.cfg.TRAIN.OUTPUT_SIZE**2,-1)
 
-        l = xs[:, None] - bboxes[:, 0][None].float()
-        t = ys[:, None] - bboxes[:, 1][None].float()
-        r = bboxes[:, 2][None].float() - xs[:, None]
-        b = bboxes[:, 3][None].float() - ys[:, None]
+        # 小心這裡的 bboxes 有多一個對應用的數字，所以取值的 idx 要改
+        l = xs[:, None] - bboxes[:, 1][None].float()
+        t = ys[:, None] - bboxes[:, 2][None].float()
+        r = bboxes[:, 3][None].float() - xs[:, None]
+        b = bboxes[:, 4][None].float() - ys[:, None]
         reg_targets_per_im = torch.stack([l, t, r, b], dim=2)
 
-        s1 = reg_targets_per_im[:, :, 0] > 0.6*((bboxes[:,2]-bboxes[:,0])/2).float()
-        s2 = reg_targets_per_im[:, :, 2] > 0.6*((bboxes[:,2]-bboxes[:,0])/2).float()
-        s3 = reg_targets_per_im[:, :, 1] > 0.6*((bboxes[:,3]-bboxes[:,1])/2).float()
-        s4 = reg_targets_per_im[:, :, 3] > 0.6*((bboxes[:,3]-bboxes[:,1])/2).float()
+        s1 = reg_targets_per_im[:, :, 0] > 0.6*((bboxes[:,3]-bboxes[:,1]) / 2.).float()
+        s2 = reg_targets_per_im[:, :, 2] > 0.6*((bboxes[:,3]-bboxes[:,1]) / 2.).float()
+        s3 = reg_targets_per_im[:, :, 1] > 0.6*((bboxes[:,4]-bboxes[:,2]) / 2.).float()
+        s4 = reg_targets_per_im[:, :, 3] > 0.6*((bboxes[:,4]-bboxes[:,2]) / 2.).float()
         is_in_boxes = s1*s2*s3*s4
         pos = np.where(is_in_boxes.cpu() == 1)
         labels[pos] = 1
@@ -122,9 +123,18 @@ class SiamCARLossComputation(object):
                       (top_bottom.min(dim=-1)[0] / top_bottom.max(dim=-1)[0])
         return torch.sqrt(centerness)
 
-    def __call__(self, locations, box_cls, box_regression, centerness, labels, reg_targets):
+    def __call__(
+        self,
+        locations,
+        centerness,
+        box_cls,
+        box_regression,
+        labels,
+        reg_targets
+    ):
         """
         Arguments:
+            這裡的型態都錯了吧...，都不是 list，而是 Tensor 阿
             locations (list[BoxList])
             box_cls (list[Tensor])
             box_regression (list[Tensor])
@@ -165,7 +175,9 @@ class SiamCARLossComputation(object):
             reg_loss = box_regression_flatten.sum()
             centerness_loss = centerness_flatten.sum()
 
-        return cls_loss, reg_loss, centerness_loss
+        cls_pos_loss = cls_loss
+        cls_neg_loss = cls_loss
+        return centerness_loss, cls_loss, reg_loss, cls_pos_loss, cls_neg_loss
 
 
 def make_siamcar_loss_evaluator(cfg):
