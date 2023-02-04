@@ -1,0 +1,42 @@
+BACKBONE:
+  TRAIN_EPOCH: -1  # edit
+
+TRAIN:
+  PRETRAINED: './pretrained_models/model_general.pth'  # add
+  EPOCH: 200  # edit
+  EVAL_FREQ: 2
+  SAVE_MODEL_FREQ: 4
+
+  DATASET:
+    TEMPLATE:
+      SHIFT: 4
+      SCALE: 0.05
+      BLUR:  0.0
+      FLIP:  0.0
+      COLOR: 1.0
+
+    SEARCH:
+      SHIFT: 64
+      SCALE: 0.18
+      BLUR:  0.2
+      FLIP:  0.0
+      COLOR: 1.0
+
+    NEG: 0.0
+    GRAY: 0.0
+
+TEST:
+  DATASET:
+    TEMPLATE:
+      SHIFT: 0
+      SCALE: 0.0
+      BLUR:  0.0
+      FLIP:  0.0
+      COLOR: 0.0
+
+    SEARCH:
+      SHIFT: 0
+      SCALE: 0.0
+      BLUR:  0.0
+      FLIP:  0.0
+      COLOR: 0.0

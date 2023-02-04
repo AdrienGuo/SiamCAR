@@ -16,19 +16,26 @@ class AdjustLayer(nn.Module):
             # nn.BatchNorm2d(out_channels, track_running_stats=False),
         )
 
-    def forward(self, x):
+    def forward(self, x, method):
+        """
+        if method == "origin": 不要做裁切。
+        else: 會對 template 做裁切，方法如下：
+            原文 (SiamRPN++)
+            Thus we crop the center 7 × 7 regions [41] as the template
+            feature where each feature cell can still capture the entire
+            target region.
+        """
+
         x = self.downsample(x)
 
-        # 就在這裡!! 會把 template feature map 做 crop
-        """ 原文 (SiamRPN++)
-        Thus we crop the center 7 × 7 regions [41] as the template
-        feature where each feature cell can still capture the entire
-        target region.
-        """
-        if x.size(3) < 20:
-            l = 4
-            r = l + 7
-            x = x[:, :, l:r, l:r]
+        if method == "origin":
+            pass
+        else:
+            if x.size(3) < 20:
+                l = 4
+                r = l + 7
+                x = x[:, :, l:r, l:r]
+
         return x
 
 
@@ -43,12 +50,12 @@ class AdjustAllLayer(nn.Module):
                 self.add_module('downsample'+str(i+2),
                                 AdjustLayer(in_channels[i], out_channels[i]))
 
-    def forward(self, features):
+    def forward(self, features, method):
         if self.num == 1:
-            return self.downsample(features)
+            return self.downsample(features, method)
         else:
             out = []
             for i in range(self.num):
                 adj_layer = getattr(self, 'downsample'+str(i+2))
-                out.append(adj_layer(features[i]).contiguous())
+                out.append(adj_layer(features[i], method).contiguous())
             return out

@@ -7,12 +7,14 @@ import os
 import random
 import time
 
+import colorama
 import cv2
 import ipdb
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torchvision.transforms.functional as F
+from colorama import Fore
 from PIL import Image, ImageDraw, ImageFont
 from torch.cuda.amp import autocast
 # from toolkit.datasets import DatasetFactory
@@ -20,17 +22,16 @@ from torch.utils.data import DataLoader, Subset
 from torchvision import transforms
 
 from pysot.core.config import cfg
+from pysot.datasets.augmentation.pcb_aug import PCBAugmentation
 from pysot.datasets.collate import collate_fn
-# from pysot.datasets.pcbdataset.pcbdataset_origin import PCBDatasetOrigin
 from pysot.datasets.pcbdataset import get_pcbdataset
 from pysot.models.model_builder import ModelBuilder
 from pysot.tracker.siamcar_tracker import SiamCARTracker
-from pysot.utils.bbox import get_axis_aligned_bbox
-from pysot.utils.check_image import draw_preds, save_image
 from pysot.utils.model_load import load_pretrain
 from toolkit.statistics import overlap_ratio_one
 
 torch.set_num_threads(1)
+colorama.init(autoreset=True)
 
 
 def calculate_metrics(pred_boxes, label_boxes):
@@ -39,7 +40,8 @@ def calculate_metrics(pred_boxes, label_boxes):
         pred_boxes (list): (data_num, pred_num, 4)
         label_boxes (list): (data_num, label_num, 4)
     """
-    assert len(pred_boxes) == len(label_boxes), "ERROR, length of pred_boxes and label_boxes should be the same"
+    assert len(pred_boxes) == len(
+        label_boxes), "ERROR, length of pred_boxes and label_boxes should be the same"
 
     tp = list()
     fp = list()
@@ -54,7 +56,8 @@ def calculate_metrics(pred_boxes, label_boxes):
             best_iou = 0
             for label_idx in range(len(label_boxes[idx])):
                 # 這個 data 裡面的一個 label_box
-                iou = overlap_ratio_one(pred_boxes[idx][pred_idx], label_boxes[idx][label_idx])
+                iou = overlap_ratio_one(
+                    pred_boxes[idx][pred_idx], label_boxes[idx][label_idx])
                 if iou > best_iou:
                     # 記錄這一個 pred_box 和所有 label_boxes 最大的 iou
                     best_iou = iou
@@ -112,8 +115,8 @@ def evaluate(test_loader, tracker):
             x_img = data['x_img'].cuda()
             gt_boxes = data['gt_boxes']
 
-            print(f"Load image from: {img_path}")
             img = cv2.imread(img_path)
+            print(f"Load image from: {Fore.GREEN}{img_path}")
             # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
             ######################################
@@ -138,18 +141,9 @@ def evaluate(test_loader, tracker):
             # tic = cv2.getTickCount()
             start = time.time()
 
-            # 用 template image 將 tracker 初始化
             with autocast():
                 _ = tracker.init(z_img, z_box)
-                # _ = tracker.init(img, z_box)
-
-            ######################################
-            # Do tracking (predict)
-            ######################################
-            # 用 search image 進行 "track" 的動作
-            with autocast():
                 outputs = tracker.track(x_img, hp)
-                # outputs = tracker.track(img, hp)
 
             # toc = cv2.getTickCount()
             # clocks += toc - tic    # 總共有多少個 clocks (clock cycles)
@@ -165,56 +159,79 @@ def evaluate(test_loader, tracker):
         precision, recall = calculate_metrics(all_pred_boxes, all_gt_boxes)
         precision = precision * 100
         recall = recall * 100
-
-        print(f"Precision: {precision}")
-        print(f"Recall: {recall}")
-
         # period = clocks / cv2.getTickFrequency()
         fps = (idx + 1) / period
-        print(f"Speed: {fps} fps")
 
         return {
-            "precision": precision,
-            "recall": recall,
-            "fps": fps
+            'Recall': recall,
+            'Precision': precision,
+            'fps': fps
         }
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='siamcar tracking')
     parser.add_argument('--model', type=str, default='', help='model to eval')
-    parser.add_argument('--dataset_name', type=str, default='', help='dataset name')
-    parser.add_argument('--test_dataset', type=str, default='', help='testing dataset')
-    parser.add_argument('--criteria', type=str, default='', help='criteria of dataset')
-    parser.add_argument('--target', type=str, default='', help='Number of targets to predict')
-    parser.add_argument('--method', type=str, default='', help='method for dataset')
+    parser.add_argument('--data', type=str,
+                        default='', help='path of evaluate data')
+    parser.add_argument('--dataset', type=str,
+                        default='', help='dataset name')
+    parser.add_argument('--criteria', type=str, default='',
+                        help='criteria of dataset')
+    parser.add_argument('--target', type=str, default='',
+                        help='Number of targets to predict')
+    parser.add_argument('--method', type=str, default='',
+                        help='method for dataset')
     parser.add_argument('--neg', type=float, default=0.0, help='negative pair')
     parser.add_argument('--bg', type=str, help='background of template')
-    parser.add_argument('--cfg', type=str, default='./experiments/siamcar_r50/config.yaml', help='configuration of tracking')
+    parser.add_argument(
+        '--cfg', type=str, default='./experiments/siamcar_r50/config.yaml', help='configuration of tracking')
     args = parser.parse_args()
 
-    cfg.merge_from_file(args.cfg)  # 不加 ModelBuilder() 會出問題ㄟ ??
+    # Config
+    siamcar_cfg = "./experiments/siamcar_r50/config.yaml"
+    cfg.merge_from_file(siamcar_cfg)
+    cfg.merge_from_file(args.cfg)
 
     # Load model & Build tracker
-    print(f"Loading model from: {args.model} ...")
+    print(f"Loading model from: {args.model}")
     model = ModelBuilder()
-    model = load_pretrain(model, args.model).cuda().train()
+    model = load_pretrain(model, args.model).cuda()
+    model.eval()
     tracker = SiamCARTracker(model, cfg.TRACK)
+
+    # Datasets arguments
+    data_args = {
+        'data_path': args.data,
+        'method': args.method,
+        'criteria': args.criteria,
+        'bg': args.bg,
+        'target': args.target,
+    }
+
+    # Data augmentations
+    data_augmentation = {
+        'template': PCBAugmentation(cfg.TEST.DATASET.TEMPLATE),
+        'search': PCBAugmentation(cfg.TEST.DATASET.SEARCH),
+    }
 
     # Build dataset
     print("Building dataset...")
     pcbdataset = get_pcbdataset(args.method)
-    dataset = pcbdataset(args, "test")
-    print(f"Dataset size: {len(dataset)}")
-    assert len(dataset) != 0, "ERROR, empty dataset"
-    test_loader = DataLoader(
+    dataset = pcbdataset(data_args, mode="test",
+                         augmentation=data_augmentation)
+    assert len(dataset) != 0, "ERROR, dataset is empty!!"
+    print(f"Demo dataset size: {len(dataset)}")
+    evaluate_loader = DataLoader(
         dataset,
-        batch_size=1,  # 只能設 1
-        num_workers=8,
-        collate_fn=collate_fn
-    )
+        batch_size=1,
+        num_workers=0,
+        collate_fn=collate_fn)
 
     print("Start evaluating...")
-    metrics = evaluate(test_loader, tracker)
+    metrics = evaluate(evaluate_loader, tracker)
+    print(f"Metrics of: {Fore.GREEN}{args.data}")
+    for key, value in metrics.items():
+        print(f"{key}: {value}")
 
     print("=" * 20, "DONE!", "=" * 20, "\n")

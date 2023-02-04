@@ -26,7 +26,7 @@ from pysot.core.config import cfg
 from pysot.datasets.collate_amy import collate_fn_new
 from pysot.datasets.pcbdataset_multi_text import PCBDataset
 from pysot.models.model_builder_amy import ModelBuilder
-from pysot.utils.average_meter import AverageMeter
+from pysot.utils.average_meter_official import AverageMeter
 from pysot.utils.check_image import create_dir
 from pysot.utils.distributed import (average_reduce, dist_init, get_rank,
                                      get_world_size, reduce_gradients)

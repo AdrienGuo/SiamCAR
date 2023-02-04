@@ -24,7 +24,7 @@ class SiamCARTracker(SiameseTracker):
         self.window = np.outer(hanning, hanning)
         self.model = model
         # 一定要特別標起來紀念一下 (11/18/2022)
-        self.model.eval()
+        # self.model.eval()
 
     def _convert_cls(self, cls):
         cls = F.softmax(cls[:, :, :, :], dim=1).data[:, 1, :, :].cpu().numpy()

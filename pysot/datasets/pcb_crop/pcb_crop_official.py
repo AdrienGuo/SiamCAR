@@ -75,13 +75,14 @@ class PCBCropOfficial:
         img511, z_box511 = self.make_img511(
             img, z_box, out_size=511, padding=padding)
 
+        avg_chans = np.mean(img511, axis=(0, 1))
         # z_img: (127, 127, 3)
         z_img = self.get_template(
-            img511, z_box511, padding=padding)
+            img511, z_box511, padding=avg_chans)
         # search image 要使用 spatial aware sampling
         # x_img: (255, 255, 3)
         x_img, z_box = self.get_search(
-            img511, z_box511, padding=padding)
+            img511, z_box511, padding=avg_chans)
 
         z_box = z_box[np.newaxis, :]
         gt_boxes = z_box  # 官方的作法只有單物件，所以兩個一樣

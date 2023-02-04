@@ -44,7 +44,7 @@ def draw_box(image, boxes, type=None, scores: np = None):
     """
     Args:
         image: type=array
-        boxes: (box_num, [x1, y1, w, h])
+        boxes: (box_num, [x1, y1, x2, y2])
         type: template / pred / gt
         scores: type=array
     """
@@ -68,19 +68,24 @@ def draw_box(image, boxes, type=None, scores: np = None):
     # draw targets
     for idx, box in enumerate(boxes):
         # 畫框框
-        cv2.rectangle(image_new, (box[0], box[1]), (box[0] + box[2], box[1] + box[3]), color=color, thickness=thickness)
+        cv2.rectangle(image_new, (box[0], box[1]),
+                      (box[0] + box[2], box[1] + box[3]),
+                      color=color, thickness=thickness)
         # 在框框上面打分數
         if np.any(scores):
             fontFace = cv2.FONT_HERSHEY_SIMPLEX
             fontScale = 0.5
             score = f"{scores[idx]:.3f}"
-            labelSize = cv2.getTextSize(score, fontFace, fontScale, thickness=1)
+            labelSize = cv2.getTextSize(
+                score, fontFace, fontScale, thickness=1)
             _x1 = box[0]    # bottomleft x of text
             _y1 = box[1]    # bottomleft y of text
             _x2 = box[0] + labelSize[0][0]    # topright x of text
             _y2 = box[1] + labelSize[0][1]    # topright y of text
-            cv2.rectangle(image_new, (_x1, _y1), (_x2, _y2), (0, 255, 0), cv2.FILLED)   # text background
-            cv2.putText(image_new, score, (_x1, _y2), fontFace, fontScale, color=(0, 0, 0), thickness=1)
+            cv2.rectangle(image_new, (_x1, _y1), (_x2, _y2),
+                          (0, 255, 0), cv2.FILLED)   # text background
+            cv2.putText(image_new, score, (_x1, _y2), fontFace,
+                        fontScale, color=(0, 0, 0), thickness=1)
 
     return image_new
 
@@ -106,8 +111,9 @@ def draw_preds(search_image, scores, annotation_path, idx):
                 anno = list(map(float, anno))
                 preds.append(anno[:-1])  # 最後一個是 score
 
+    # TODO: draw_preds 就給我畫 pred 就好，畫什麼 template 阿...
     # Draw template
-    search_image = draw_box(search_image, [template], type="template")
+    # search_image = draw_box(search_image, [template], type="template")
     # Draw preds
     pred_image = draw_box(search_image, preds, type="pred", scores=scores)
 
@@ -130,7 +136,8 @@ def draw_heatmap(img, heatmap, alpha=0.9):
     # plt will cause memory leak if not clear it.
     fig, ax = plt.subplots(num=1, clear=True)
     # Probability Info
-    ax.text(img_w // 2, -10, f"Max: {str(np.around(heatmap.max(), 3))}", fontsize=12)
+    ax.text(img_w // 2, -10,
+            f"Max: {str(np.around(heatmap.max(), 3))}", fontsize=12)
     plt.imshow(img, alpha=alpha)
     # Set the colorbar range (vmin, vmax)
     plt.imshow(heatmap, alpha=0.2, cmap="jet", vmin=0.0, vmax=1.0)

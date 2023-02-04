@@ -11,16 +11,17 @@ import torch.nn.functional as F
 from pysot.core.config import cfg
 from pysot.models.backbone import get_backbone
 from pysot.models.head.car_head import CARHead
-from pysot.models.loss_car_multi import make_siamcar_loss_evaluator
-# from pysot.models.loss_car_official import make_siamcar_loss_evaluator
+# from pysot.models.loss_car_multi import make_siamcar_loss_evaluator
+from pysot.models.loss_car_official import make_siamcar_loss_evaluator
 from pysot.models.neck import get_neck
 from pysot.utils.xcorr import xcorr_depthwise
 
-from ..utils.location_grid import compute_locations
+# from ..utils.location_grid import compute_locations
+from ..utils.location_grid_official import compute_locations
 
 
 class ModelBuilder(nn.Module):
-    def __init__(self):
+    def __init__(self, method):
         super(ModelBuilder, self).__init__()
 
         # build backbone
@@ -41,19 +42,31 @@ class ModelBuilder(nn.Module):
         # build loss
         self.loss_evaluator = make_siamcar_loss_evaluator(cfg)
 
-        self.down = nn.ConvTranspose2d(cfg.ADJUST.channel * 3, cfg.ADJUST.channel, 1, 1)
+        self.down = nn.ConvTranspose2d(
+            cfg.ADJUST.channel * 3, cfg.ADJUST.channel, 1, 1)
+
+        # method could be different between training and evaluating.
+        self._method = method
+
+    @property
+    def method(self):
+        return self._method
+
+    @method.setter
+    def method(self, new_method):
+        self._method = new_method
 
     def template(self, z):
         zf = self.backbone(z)
         if cfg.ADJUST.ADJUST:
-            zf = self.neck(zf)
+            zf = self.neck(zf, self._method)
         self.zf = zf
 
     def track(self, x):
         xf = self.backbone(x)
 
         if cfg.ADJUST.ADJUST:
-            xf = self.neck(xf)
+            xf = self.neck(xf, self._method)
 
         features = self.xcorr_depthwise(xf[0], self.zf[0])
         for i in range(len(xf) - 1):
@@ -78,8 +91,8 @@ class ModelBuilder(nn.Module):
 
     # TODO: @autucast()
     def forward(self, data):
-        """ only used in training
-        """
+        """only used in training"""
+
         z_img = data['z_img'].cuda()
         x_img = data['x_img'].cuda()
         gt_cls = data['gt_cls'].cuda()
@@ -93,8 +106,8 @@ class ModelBuilder(nn.Module):
         # neck
         # 應該也是使用同一個 neck
         if cfg.ADJUST.ADJUST:
-            zf = self.neck(zf)
-            xf = self.neck(xf)
+            zf = self.neck(zf, self._method)
+            xf = self.neck(xf, self._method)
 
         # Depthwise Correlation
         features = self.xcorr_depthwise(xf[0], zf[0])
@@ -104,7 +117,7 @@ class ModelBuilder(nn.Module):
         # features: (b, c=256, h, w)
         features = self.down(features)
 
-        # Classificaitn, Regression, Centerness
+        # Classification, Regression, Centerness
         # cls: (B, 2, H, W)
         # loc: (B, 4, H, W)
         # cen: (B, 1, H, W)
@@ -112,28 +125,29 @@ class ModelBuilder(nn.Module):
 
         # 做 meshgrid，需要 x_img 來算出位移。
         # locations: (size_h * size_w, [x, y])
-        locations = compute_locations(cls, cfg.TRACK.STRIDE, x_img)
+        # locations = compute_locations(cls, cfg.TRACK.STRIDE, x_img)
+        locations = compute_locations(cls, cfg.TRACK.STRIDE)
         # cls: (B, 2, H, W) -> (B, 1, H, W, 2)
         cls = self.log_softmax(cls)
 
         # Calculate loss
         cen_loss, cls_loss, loc_loss, cls_pos_loss, cls_neg_loss \
-        = self.loss_evaluator(
-            locations,
-            cen,
-            cls,
-            loc,
-            gt_cls,
-            gt_boxes
-        )
+            = self.loss_evaluator(
+                locations,
+                cen,
+                cls,
+                loc,
+                gt_cls,
+                gt_boxes
+            )
 
-        # Get loss
-        loss = dict()
-        loss['cen'] = cen_loss
-        loss['cls'] = cls_loss
-        loss['loc'] = loc_loss
-        loss['total'] = cfg.TRAIN.CLS_WEIGHT * cls_loss + \
+        # Get losses
+        losses = dict()
+        losses['cen'] = cen_loss
+        losses['cls'] = cls_loss
+        losses['loc'] = loc_loss
+        losses['total'] = cfg.TRAIN.CLS_WEIGHT * cls_loss + \
             cfg.TRAIN.LOC_WEIGHT * loc_loss + cfg.TRAIN.CEN_WEIGHT * cen_loss
-        loss['cls_pos'] = cls_pos_loss
-        loss['cls_neg'] = cls_neg_loss
-        return loss
+        losses['cls_pos'] = cls_pos_loss
+        losses['cls_neg'] = cls_neg_loss
+        return losses

@@ -1,0 +1,34 @@
+TRAIN:
+  DATASET:
+    TEMPLATE:
+      SHIFT: 0  # 4
+      SCALE: 0.0  # 0.05
+      BLUR:  0.0
+      FLIP:  0.0
+      COLOR: 0.0  # 1.0
+
+    SEARCH:
+      SHIFT: 0
+      SCALE: 0.0  # 0.18
+      BLUR:  0.0  # 0.2
+      FLIP:  0.0
+      COLOR: 0.0  # 1.0
+
+    NEG: 0.0
+    GRAY: 0.0
+
+TEST:
+  DATASET:
+    TEMPLATE:
+      SHIFT: 0
+      SCALE: 0.0
+      BLUR:  0.0
+      FLIP:  0.0
+      COLOR: 0.0
+
+    SEARCH:
+      SHIFT: 0
+      SCALE: 0.0
+      BLUR:  0.0
+      FLIP:  0.0
+      COLOR: 0.0

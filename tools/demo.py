@@ -15,15 +15,12 @@ import numpy as np
 import torch
 import torchvision.transforms.functional as F
 from colorama import Fore
-from eval import calculate_metrics
 from PIL import Image
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
 from pysot.core.config import cfg
 from pysot.datasets.collate import collate_fn
-# new / tri / origin
-# from pysot.datasets.pcbdataset.pcbdataset_origin import PCBDataset
 from pysot.datasets.pcbdataset import get_pcbdataset
 from pysot.models.model_builder import ModelBuilder
 # tracker 可以改
@@ -34,6 +31,8 @@ from pysot.utils.check_image import (create_dir, draw_box, draw_heatmap,
                                      draw_preds, get_path, save_fig,
                                      save_image)
 from pysot.utils.model_load import load_pretrain
+from tools.evaluate import calculate_metrics
+from tools.engines.demo.demoer import Demoer
 
 sys.path.append('../')
 
@@ -92,7 +91,7 @@ def save_heatmap(heatmap: np.ndarray, img: np.ndarray, dir: str, idx: int) -> np
     return heatmap
 
 
-def test_and_eval(tracker, test_loader, dataset_name: str):
+def test_and_eval(tracker, test_loader, dataset: str):
     # hp_search
     params = getattr(cfg.HP_SEARCH, "PCB")
     hp = {'lr': params[0], 'penalty_k': params[1], 'window_lr': params[2]}
@@ -119,11 +118,12 @@ def test_and_eval(tracker, test_loader, dataset_name: str):
         # 用 PatternMatch_test 資料集的時候不能加，
         # 因為 img_path 的路徑是 dir 不是 path
         img = None
-        if dataset_name != "PatternMatch_test" and dataset_name != "tmp":
+        if dataset != "PatternMatch_test" and dataset != "tmp":
             img = cv2.imread(img_path)
             # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             # Save original image
-            origin_path = os.path.join(path_dir_map['origin'], f"{img_name}.jpg")
+            origin_path = os.path.join(
+                path_dir_map['origin'], f"{img_name}.jpg")
             save_image(img, origin_path)
 
         ##########################################
@@ -156,7 +156,8 @@ def test_and_eval(tracker, test_loader, dataset_name: str):
 
         # Save z_img
         z_img = z_img.cpu().numpy().squeeze()
-        z_img = np.transpose(z_img, (1, 2, 0))  # (3, 127, 127) -> (127, 127, 3)
+        # (3, 127, 127) -> (127, 127, 3)
+        z_img = np.transpose(z_img, (1, 2, 0))
         z_path = os.path.join(path_dir_map['template'], f"{idx}.jpg")
         save_image(z_img, z_path)
 
@@ -168,9 +169,12 @@ def test_and_eval(tracker, test_loader, dataset_name: str):
         save_image(x_img, x_path)
 
         # Save cen, cls, score heatmaps
-        heatmap_cen = save_heatmap(outputs['cen'], x_img, path_dir_map['heatmap_cen'], idx)
-        heatmap_cls = save_heatmap(outputs['cls'], x_img, path_dir_map['heatmap_cls'], idx)
-        heatmap_score = save_heatmap(outputs['score'], x_img, path_dir_map['heatmap_score'], idx)
+        heatmap_cen = save_heatmap(
+            outputs['cen'], x_img, path_dir_map['heatmap_cen'], idx)
+        heatmap_cls = save_heatmap(
+            outputs['cls'], x_img, path_dir_map['heatmap_cls'], idx)
+        heatmap_score = save_heatmap(
+            outputs['score'], x_img, path_dir_map['heatmap_score'], idx)
 
         # pred_scores on x_img
         scores = np.around(outputs['top_scores'], decimals=2)
@@ -206,8 +210,9 @@ def test_and_eval(tracker, test_loader, dataset_name: str):
         # Save Fail pred image
         ##########################################
         # 因為 PatternMatch_test 資料集沒有標籤，不能去算 precision, recall
-        if dataset_name != "PatternMatch_test" and dataset_name != "tmp":
-            precision, recall = calculate_metrics([outputs['pred_boxes']], [gt_boxes.tolist()])
+        if dataset != "PatternMatch_test" and dataset != "tmp":
+            precision, recall = calculate_metrics(
+                [outputs['pred_boxes']], [gt_boxes.tolist()])
             if precision != 1 or recall != 1:
                 save_fail_img(
                     img_name, img, z_img, x_img, pred_img, heatmap_cen, heatmap_cls, heatmap_score, idx
@@ -218,7 +223,7 @@ def test_and_eval(tracker, test_loader, dataset_name: str):
 
         # ipdb.set_trace()
 
-    if dataset_name != "PatternMatch_test" and dataset_name != "tmp":
+    if dataset != "PatternMatch_test" and dataset != "tmp":
         precision, recall = calculate_metrics(all_pred_boxes, all_gt_boxes)
         precision = precision * 100
         recall = recall * 100
@@ -229,55 +234,68 @@ def test_and_eval(tracker, test_loader, dataset_name: str):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='siamcar tracking')
     parser.add_argument('--model', type=str, default='', help='model to eval')
-    parser.add_argument('--dataset_name', type=str, default='', help='dataset name')
+    parser.add_argument('--dataset', type=str,
+                        default='', help='dataset name')
     parser.add_argument('--part', type=str, default='', help='train / test')
-    parser.add_argument('--test_dataset', type=str, default='', help='testing dataset')
-    parser.add_argument('--criteria', type=str, default='', help='criteria of dataset')
-    parser.add_argument('--target', type=str, default='', help='Number of targets to predict')
-    parser.add_argument('--method', type=str, default='', help='method for dataset')
+    parser.add_argument('--data', type=str,
+                        default='', help='path of demo data')
+    parser.add_argument('--criteria', type=str, default='',
+                        help='criteria of dataset')
+    parser.add_argument('--target', type=str, default='',
+                        help='Number of targets to predict')
+    parser.add_argument('--method', type=str, default='',
+                        help='method for dataset')
     parser.add_argument('--neg', type=float, default=0.0, help='negative pair')
     parser.add_argument('--bg', type=str, help='background of template')
-    parser.add_argument('--cfg', type=str, default='./experiments/siamcar_r50/config.yaml', help='configuration of tracking')
+    parser.add_argument(
+        '--cfg', type=str, default='./experiments/siamcar_r50/config.yaml', help='configuration of tracking')
     args = parser.parse_args()
 
-    # Merge config
-    cfg.merge_from_file(args.cfg)
+    demoer = Demoer(args)
+    demoer.build_tracker(model_path=args.model)
+    demoer.build_dataloader()
+    demoer.create_save_dirs()
+    demoer.demo()
+    demoer.evaluate()
 
-    # Load model & Build tracker
-    print(f"Loading model from: {args.model} ...")
-    model = ModelBuilder()
-    model = load_pretrain(model, args.model).cuda().eval()
-    # model = load_pretrain(model, args.model).cuda().train()
-    tracker = SiamCARTracker(model, cfg.TRACK)
+    # # Merge config
+    # cfg.merge_from_file(args.cfg)
 
-    # Build dataset
-    print("Building dataset...")
-    pcbdataset = get_pcbdataset(args.method)
-    dataset = pcbdataset(args, mode="test")
-    assert len(dataset) != 0, "ERROR, dataset is empty!!"
-    print(f"Test dataset size: {len(dataset)}")
-    test_loader = DataLoader(
-        dataset,
-        batch_size=1,
-        num_workers=8,
-        collate_fn=collate_fn
-    )
+    # # Load model & Build tracker
+    # print(f"Loading model from: {args.model} ...")
+    # model = ModelBuilder()
+    # model = load_pretrain(model, args.model).cuda()
+    # model.eval()
+    # tracker = SiamCARTracker(model, cfg.TRACK)
 
-    # Create dirs to save results
-    model_dir = args.model.split('/')[-2]
-    model_ckpt = args.model.split('/')[-1].rsplit('.', 1)[0]
-    model_name = model_dir + '_' + model_ckpt
-    print(f"Model name: {model_name}")
-    save_dir = os.path.join(
-        "./results", args.part, args.dataset_name, args.criteria, args.target, args.method, model_name)
-    create_dir(save_dir)
-    print(f"Test results saved to: {save_dir}")
-    # PatternMatch_test 因為沒有標籤，沒有辦法判斷是否 fail
-    if args.dataset_name != "PatternMatch_test" and args.dataset_name != "tmp":
-        fail_dir = os.path.join(save_dir, "FAILED")
-        create_dir(fail_dir)
-        print(f"Failed results saved to: {fail_dir}")
+    # # Build dataset
+    # print("Building dataset...")
+    # pcbdataset = get_pcbdataset(args.method)
+    # dataset = pcbdataset(args, mode="test")
+    # assert len(dataset) != 0, "ERROR, dataset is empty!!"
+    # print(f"Test dataset size: {len(dataset)}")
+    # test_loader = DataLoader(
+    #     dataset,
+    #     batch_size=1,
+    #     num_workers=8,
+    #     collate_fn=collate_fn
+    # )
 
-    test_and_eval(tracker, test_loader, args.dataset_name)
+    # # Create dirs to save results
+    # model_dir = args.model.split('/')[-2]
+    # model_ckpt = args.model.split('/')[-1].rsplit('.', 1)[0]
+    # model_name = model_dir + '_' + model_ckpt
+    # print(f"Model name: {model_name}")
+    # save_dir = os.path.join(
+    #     "./results", args.part, args.dataset, args.criteria, args.target, args.method, model_name)
+    # create_dir(save_dir)
+    # print(f"Test results saved to: {save_dir}")
+    # # PatternMatch_test 因為沒有標籤，沒有辦法判斷是否 fail
+    # if args.dataset != "PatternMatch_test" and args.dataset != "tmp":
+    #     fail_dir = os.path.join(save_dir, "FAILED")
+    #     create_dir(fail_dir)
+    #     print(f"Failed results saved to: {fail_dir}")
 
-    print('=' * 20, "DONE!", '=' * 20)
+    # test_and_eval(tracker, test_loader, args.dataset)
+
+    # print('=' * 20, "DONE!", '=' * 20)

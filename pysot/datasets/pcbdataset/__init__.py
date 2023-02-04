@@ -2,12 +2,14 @@ from .pcbdataset import PCBDataset
 from .pcbdataset_tri import PCBDatasetTri
 
 # Define pcbdataset dictionary
-pcbdataset_ = {
+pcb_dataset = {
+    'siamcar': PCBDataset,
     'origin': PCBDataset,
-    'search': PCBDataset,
-    'official': PCBDataset,
-    'tri_origin': PCBDatasetTri
+    'official_origin': PCBDataset,
+    'tri_origin': PCBDatasetTri,
+    'tri_127_origin': PCBDatasetTri,
 }
 
+
 def get_pcbdataset(method):
-    return pcbdataset_[method]
+    return pcb_dataset[method]

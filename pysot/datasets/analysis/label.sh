@@ -1,13 +1,11 @@
 # bin/bash
 
-part="train"
-dataset="wrong_labels"
-criteria="all"
+part="test"
+dataset="all"
 
 
 echo "Part: ${part}"
 echo "Dataset: ${dataset}"
-echo "Criteria: ${criteria}"
 sleep 3
 
 
@@ -16,4 +14,3 @@ python3 \
     --part ${part} \
     --dataset_name ${dataset} \
     --dataset ./datasets/${part}/${dataset} \
-    --criteria ${criteria} \

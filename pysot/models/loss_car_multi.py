@@ -75,7 +75,8 @@ class CLSLoss(object):
 
         alpha = cfg.TRAIN.LOSS_ALPHA
         gamma = cfg.TRAIN.LOSS_GAMMA
-        if isinstance(alpha, (float, int)): alpha = torch.Tensor([alpha, 1-alpha])
+        if isinstance(alpha, (float, int)):
+            alpha = torch.Tensor([alpha, 1-alpha])
 
         # TODO: 把 pos, neg 的 loss 分開算
         if alpha is not None:
@@ -117,12 +118,13 @@ class IOULoss(nn.Module):
         target_bottom = target[:, 3]
 
         pred_area = (pred_left + pred_right) * (pred_top + pred_bottom)
-        target_area = (target_left + target_right) * (target_top + target_bottom)
+        target_area = (target_left + target_right) * \
+            (target_top + target_bottom)
 
         w_intersect = torch.min(pred_left, target_left) \
-                      + torch.min(pred_right, target_right)
+            + torch.min(pred_right, target_right)
         h_intersect = torch.min(pred_bottom, target_bottom) \
-                      + torch.min(pred_top, target_top)
+            + torch.min(pred_top, target_top)
 
         area_intersect = w_intersect * h_intersect
         area_union = target_area + pred_area - area_intersect
@@ -152,7 +154,8 @@ class GIOULoss(nn.Module):
         target_right = target[:, 2]
         target_bottom = target[:, 3]
 
-        target_area = (target_left + target_right) * (target_top + target_bottom)
+        target_area = (target_left + target_right) * \
+            (target_top + target_bottom)
         pred_area = (pred_left + pred_right) * (pred_top + pred_bottom)
 
         w_intersect = torch.min(pred_left, target_left) \
@@ -167,10 +170,10 @@ class GIOULoss(nn.Module):
 
         # enclosure
         gw_intersect = torch.max(pred_left, target_left) + \
-                      torch.max(pred_right, target_right)
+            torch.max(pred_right, target_right)
         gh_intersect = torch.max(pred_bottom, target_bottom) + \
-                      torch.max(pred_top, target_top)
-        g_area = gw_intersect*gh_intersect+ 1e-7
+            torch.max(pred_top, target_top)
+        g_area = gw_intersect*gh_intersect + 1e-7
         giou = iou - (g_area - area_union)/(g_area)
         losses = 1. - giou
         if weight is not None and weight.sum() > 0:
@@ -224,7 +227,8 @@ class SiamCARLossComputation(object):
 
         for i in range(B):  # 每次處裡一張，有 batch 張
             # 選出和這張對應到的那些 gt_boxes
-            match_boxes = bboxes[(bboxes[:, 0] == i).nonzero(as_tuple=False).squeeze(dim=1)]
+            match_boxes = bboxes[(bboxes[:, 0] == i).nonzero(
+                as_tuple=False).squeeze(dim=1)]
             # for j in range(len(bboxes)):
             #     if bboxes[j][0] == i:
             #         # 代表是對應到的 boxes
@@ -252,24 +256,30 @@ class SiamCARLossComputation(object):
             # RuntimeError: Integer division of tensors using div or / is no longer supported,
             # and in a future release div will perform true division as in Python 3.
             # Use true_divide or floor_divide (// in Python) instead
-            s1 = reg_targets_per_im[:, :, 0] > 0.6 * ((match_boxes[:, 3] - match_boxes[:, 1]) / 2.).float()
-            s2 = reg_targets_per_im[:, :, 2] > 0.6 * ((match_boxes[:, 3] - match_boxes[:, 1]) / 2.).float()
-            s3 = reg_targets_per_im[:, :, 1] > 0.6 * ((match_boxes[:, 4] - match_boxes[:, 2]) / 2.).float()
-            s4 = reg_targets_per_im[:, :, 3] > 0.6 * ((match_boxes[:, 4] - match_boxes[:, 2]) / 2.).float()
+            s1 = reg_targets_per_im[:, :, 0] > 0.6 * \
+                ((match_boxes[:, 3] - match_boxes[:, 1]) / 2.).float()
+            s2 = reg_targets_per_im[:, :, 2] > 0.6 * \
+                ((match_boxes[:, 3] - match_boxes[:, 1]) / 2.).float()
+            s3 = reg_targets_per_im[:, :, 1] > 0.6 * \
+                ((match_boxes[:, 4] - match_boxes[:, 2]) / 2.).float()
+            s4 = reg_targets_per_im[:, :, 3] > 0.6 * \
+                ((match_boxes[:, 4] - match_boxes[:, 2]) / 2.).float()
             # is_in_boxes: (N, G)
             is_in_boxes = s1 * s2 * s3 * s4
 
             # is_in_boxes: (G, N)
             is_in_boxes = is_in_boxes.permute(1, 0).contiguous()
             # gt_cls_per_im: (G, size * size)
-            gt_cls_per_im = torch.zeros(is_in_boxes.shape[0], self.score_h * self.score_w)
+            gt_cls_per_im = torch.zeros(
+                is_in_boxes.shape[0], self.score_h * self.score_w)
             for g in range(is_in_boxes.shape[0]):
                 pos = np.where(is_in_boxes[g].cpu() == 1)
                 gt_cls_per_im[g][pos] = 1
             gt_cls_all.append(gt_cls_per_im)
 
             # reg_targets_per_im: (G, N, 4=[l,t,r,b])
-            reg_targets_per_im = reg_targets_per_im.permute(1, 0, 2).contiguous()
+            reg_targets_per_im = reg_targets_per_im.permute(
+                1, 0, 2).contiguous()
             gt_regs_all.append(reg_targets_per_im)
 
         return gt_cls_all, gt_regs_all
@@ -281,7 +291,7 @@ class SiamCARLossComputation(object):
         top_bottom = reg_targets[:, [1, 3]]
         # centerness = 1 代表最中心，越遠離中心數值越接近 0
         centerness = (left_right.min(dim=-1)[0] / left_right.max(dim=-1)[0]) \
-                      * (top_bottom.min(dim=-1)[0] / top_bottom.max(dim=-1)[0])
+            * (top_bottom.min(dim=-1)[0] / top_bottom.max(dim=-1)[0])
         return torch.sqrt(centerness)
 
     def __call__(
@@ -345,7 +355,8 @@ class SiamCARLossComputation(object):
 
                 # pred 的邊界框回歸
                 # pred_boxes_flatten: (4, size, size) -> (size, size, 4) -> (size * size, 4)
-                pred_boxes_flatten = (pred_boxes[b].permute(1, 2, 0).contiguous().view(-1, 4))
+                pred_boxes_flatten = (pred_boxes[b].permute(
+                    1, 2, 0).contiguous().view(-1, 4))
                 # gt 分類
                 # gt_cls_flatten: (size * size)
                 gt_cls_flatten = (gt_cls[b][g].view(-1))
@@ -358,7 +369,8 @@ class SiamCARLossComputation(object):
 
                 # pos_inds: (size * size)
                 # 這裡的 torch.nonzero() 是取 "不是 False" 的 index
-                pos_inds = torch.nonzero(gt_cls_flatten > 0, as_tuple=False).squeeze(1)
+                pos_inds = torch.nonzero(
+                    gt_cls_flatten > 0, as_tuple=False).squeeze(1)
                 # TODO:
                 # assert pos_inds.numel() > 0, "ERROR, No positive cls in this image."
 
@@ -386,7 +398,8 @@ class SiamCARLossComputation(object):
 
                 if pos_inds.numel() > 0:
                     # centerness_targets: 距離中心點的分數 0~1，1 代表最接近中心點
-                    centerness_targets = self.compute_centerness_targets(gt_boxes_flatten)
+                    centerness_targets = self.compute_centerness_targets(
+                        gt_boxes_flatten)
                     reg_loss += self.box_reg_loss_func(
                         pred_boxes_flatten,
                         gt_boxes_flatten,

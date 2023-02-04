@@ -1,6 +1,5 @@
 # My edition
-datasets/
-!pysot/datasets
+data/
 onnx/
 snapshot/
 tools/logs/
@@ -11,7 +10,7 @@ results_image/
 results_recall/
 wandb/
 wandb_titan/
-save_models/
+models/
 train_dataset/
 results_amy/
 .vscode/
@@ -19,6 +18,7 @@ wrong_labels/
 
 # file
 .fuse_hidden*
+pyrightconfig.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

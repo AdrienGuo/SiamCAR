@@ -9,6 +9,24 @@ import numpy as np
 from pysot.utils.bbox import Center, Corner, center2corner, corner2center
 
 
+# Ref: https://github.com/albumentations-team/albumentations/blob/2a1826d49c9442ae28cf33ddef658c8e24505cf8/albumentations/augmentations/functional.py#L450
+def clahe(img, clip_limit=3.0, tile_grid_size=(8, 8)):
+    if img.dtype != np.uint8:
+        raise TypeError("clahe supports only uint8 inputs")
+
+    clahe_mat = cv2.createCLAHE(
+        clipLimit=clip_limit, tileGridSize=tile_grid_size)
+
+    if len(img.shape) == 2 or img.shape[2] == 1:
+        img = clahe_mat.apply(img)
+    else:
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
+        img[:, :, 0] = clahe_mat.apply(img[:, :, 0])
+        img = cv2.cvtColor(img, cv2.COLOR_LAB2BGR)
+
+    return img
+
+
 class Augmentation:
     def __init__(self, shift, scale, blur, flip, color):
         self.shift = shift
@@ -152,17 +170,20 @@ class Augmentation:
         bbox[:, 3] = bbox_y2
         return img, bbox
 
+    def clahe_aug(self, img):
+        return clahe(img)
+
     def __call__(self, image, bbox, size=None, gray=False):
         shape = image.shape
         # crop_bbox: (0, 0, 126, 126)
-        # crop_bbox = center2corner(Center(shape[0]//2, shape[1]//2,
-        #                                  size-1, size-1))
+        crop_bbox = center2corner(Center(shape[0]//2, shape[1]//2,
+                                         size-1, size-1))
         # gray augmentation
         if gray:
             image = self._gray_aug(image)
 
         # shift scale augmentation
-        # image, bbox = self._shift_scale_aug(image, bbox, crop_bbox, size)
+        image, bbox = self._shift_scale_aug(image, bbox, crop_bbox, size)
 
         # color augmentation
         if self.color > np.random.random():

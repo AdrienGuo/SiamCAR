@@ -1,46 +1,53 @@
 # bin/bash
 
-# Color for terminal
+# Colors for terminal
 GREEN="\e[32m"
 ENDCOLOR="\e[0m"
 
-
-dataset="all"
-criteria="mid"  # all / big / mid / small
+# Train Settings
+date="02042023"
+dataset="all"  # all / tmp
+criteria="all"  # all / mid
+method="siamcar"  # siamcar / origin / official_origin / siamfc
+bg="All"  # background
+# Test Settings
+test_dataset="all"  # all / tmp
+# Evaluate Settings
+eval_criteria="mid"  # all / mid
+eval_method="origin"  # siamcar / origin / official_origin / siamfc
+eval_bg="1.0"
+# Others Settings
 target="multi"  # one / multi
-method="origin"  # origin / search / official
-neg=(0.0)
-bg="1.0"  # 使用多少 background
-epoch=(200)
-batch_size=(1)
-accum_iters=(1)
+cfg_name="config3"
+cfg="./experiments/${date}/${cfg_name}.yaml"
 
-
-echo -e "${GREEN}=== Your Training Parameters ===${ENDCOLOR}"
-echo -e "Dataset: ${GREEN}${dataset}${ENDCOLOR}"
-echo -e "Criteria: ${GREEN}${criteria}${ENDCOLOR}"
-echo -e "Target: ${GREEN}${target}${ENDCOLOR}"
-echo -e "Method: ${GREEN}${method}${ENDCOLOR}"
-echo -e "Neg Ratio: ${GREEN}${neg}${ENDCOLOR}"
+# Double Check
+echo -e "${GREEN}=== Your Train Parameters ===${ENDCOLOR}"
+echo -e "Train Data: ${GREEN}${dataset}${ENDCOLOR}"
+echo -e "Train Criteria: ${GREEN}${criteria}${ENDCOLOR}"
+echo -e "Train Method: ${GREEN}${method}${ENDCOLOR}"
 echo -e "Background: ${GREEN}${bg}${ENDCOLOR}"
-echo -e "Epoch: ${GREEN}${epoch}${ENDCOLOR}"
-echo -e "Batch: ${GREEN}${batch_size}${ENDCOLOR}"
-echo -e "Accum Iters: ${GREEN}${accum_iters}${ENDCOLOR}"
-echo -e "${GREEN}- Check your NECK crop${ENDCOLOR}"
-echo -e "${GREEN}- Check your Learning Rate${ENDCOLOR}"
-sleep 3
+echo -e "Test Data: ${GREEN}${test_dataset}${ENDCOLOR}"
+echo -e "Eval Criteria: ${GREEN}${eval_criteria}${ENDCOLOR}"
+echo -e "Eval Method: ${GREEN}${eval_method}${ENDCOLOR}"
+echo -e "Eval Background: ${GREEN}${eval_bg}${ENDCOLOR}"
+echo -e "Target: ${GREEN}${target}${ENDCOLOR}"
+echo -e "Config: ${GREEN}${cfg} ${ENDCOLOR}"
+sleep 1
 
-
+# python3 script
 python3 \
-    ./tools/train.py \
-    --dataset_name ${dataset} \
-    --dataset ./datasets/train/${dataset} \
-    --test_dataset ./datasets/test/${dataset} \
+    tools/train.py \
+    --date ${date} \
+    --dataset ${dataset} \
+    --data "./data/TRI/train/${dataset}" \
     --criteria ${criteria} \
-    --target ${target} \
     --method ${method} \
-    --neg ${neg} \
     --bg ${bg} \
-    --epoch ${epoch} \
-    --batch_size ${batch_size} \
-    --accum_iters ${accum_iters}
+    --test_data "./data/TRI/test/${test_dataset}" \
+    --eval_criteria ${eval_criteria} \
+    --eval_method ${eval_method} \
+    --eval_bg ${eval_bg} \
+    --target ${target} \
+    --cfg_name ${cfg_name} \
+    --cfg ${cfg}

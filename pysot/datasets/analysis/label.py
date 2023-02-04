@@ -1,5 +1,5 @@
 # To find not match labels.
-# Some ground truth were set for same label,
+# Some ground truth were set for same label (same class),
 # but actually their shapes have large variation.
 # Hence, if their ratio of area are larger than the given threshold,
 # find them and save images to ./wrong_labels
@@ -67,11 +67,8 @@ def find_not_match_labels(directory: str, threshold: float):
                 for line in lines:
                     line = line.strip('\n')
                     line = line.split(' ')
-                    # line[0] = str(line[0])
-                    # line[1:5] = map(float, line[1:5])
                     cls.append(str(line[0]))
                     anno.append(list(map(float, line[1:5])))
-                    # anno.append(line)
 
                 img = cv2.imread(img_path)
                 img_h, img_w = img.shape[:2]
@@ -116,17 +113,17 @@ if __name__ == "__main__":
     parser.add_argument('--part', type=str, default='', help='train / test')
     parser.add_argument('--dataset_name', type=str, default='', help='dataset name')
     parser.add_argument('--dataset', type=str, default='', help='dataset')
-    parser.add_argument('--criteria', type=str, default='', help='criteria of dataset')
     parser.add_argument('--cfg', type=str,
                                  default='./experiments/siamcar_r50/config.yaml', help='configuration of tracking')
     args = parser.parse_args()
 
-    THRESHOLD = 2.0
+    THRESHOLD = 0
     print(f"Threshold is: {THRESHOLD}")
 
     imgs, invalid_labels = find_not_match_labels(args.dataset, THRESHOLD)
 
-    save_dir = os.path.join("./wrong_labels", args.part, args.dataset_name)
+    save_dir = os.path.join(
+        "./datasets", args.part, args.dataset_name, "visualization")
     create_dir(save_dir)
     for img_path, invalid_boxes_cls_map in zip(imgs, invalid_labels):
         draw_not_match_labels_one_img(img_path, invalid_boxes_cls_map, save_dir)
