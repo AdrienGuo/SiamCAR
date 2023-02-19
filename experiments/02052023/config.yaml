@@ -1,5 +1,5 @@
 BACKBONE:
-  TRAIN_EPOCH: 201  # edit
+  TRAIN_EPOCH: 101  # edit
 
 TRAIN:
   PRETRAINED: './pretrained_models/model_general.pth'  # add

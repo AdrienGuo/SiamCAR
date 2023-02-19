@@ -7,7 +7,7 @@ ENDCOLOR="\e[0m"
 
 # Model Info
 loss_method="bce"  # bce / focal
-train_date="01272023"
+train_date="02062023"
 train_dataset="all"  # all
 train_criteria="all"  # all
 train_target="multi"  # multi
@@ -17,18 +17,19 @@ size=(255)
 bg="1.0"  # 使用多少 background
 epoch=(200)
 batch=(1)
-ckpt=(2)
-cfg="./experiments/${train_date}/config.yaml"
+ckpt=(9)
+cfg_name="config1"
+cfg="./experiments/${train_date}/${cfg_name}.yaml"
 
 # Demo Info
-part="test"  # train / test
-dataset="all"  # all / PatternMatch_test
-criteria="mid"  # all / big / mid / small
+dataset="test"  # PatternMatch_test / train / test
+part="amy"  # all / tmp
+criteria="all"  # all / big / mid / small
 target="multi"  # one / multi
-method="origin"  # origin / tri_origin / search
+method="origin"  # origin / tri_origin
 
 # Model path
-model_dir="./models/${train_date}/${train_dataset}/${train_criteria}/${train_target}/${train_method}"
+model_dir="./models/${train_date}/${cfg_name}/${train_dataset}/${train_criteria}/${train_target}/${train_method}"
 model_name="${train_dataset}_${train_criteria}_${train_target}_${train_method}"
 ckpt="ckpt${ckpt}"
 my_model="${model_dir}/${model_name}/${ckpt}.pth"
@@ -39,10 +40,10 @@ dummy_model="./models/dummy_model_titan/dummy_model_1.pth"
 # Model to use
 model=${official_model}
 
-echo "=== Your Demo Parameters ==="
+echo "${GREEN}=== Your Demo Parameters ===${ENDCOLOR}"
 echo -e "Model: ${RED}${model} ${ENDCOLOR}"
-echo -e "Part: ${GREEN}${part} ${ENDCOLOR}"
 echo -e "Dataset: ${GREEN}${dataset} ${ENDCOLOR}"
+echo -e "Part: ${GREEN}${part} ${ENDCOLOR}"
 echo -e "Criteria: ${GREEN}${criteria} ${ENDCOLOR}"
 echo -e "Target: ${GREEN}${target} ${ENDCOLOR}"
 echo -e "Method: ${GREEN}${method} ${ENDCOLOR}"
@@ -53,9 +54,11 @@ sleep 3
 python3 \
     ./tools/demo.py \
     --model ${model} \
-    --data ./data/TRI/${part}/${dataset} \
-    --part ${part} \
+    --train_date ${train_date} \
+    --cfg_name ${cfg_name} \
+    --data ./data/TRI/${dataset}/${part} \
     --dataset ${dataset} \
+    --part ${part} \
     --criteria ${criteria} \
     --target ${target} \
     --method ${method} \

@@ -125,7 +125,7 @@ class Trainer(object):
         dataset_size = len(dataset)
         indices = list(range(dataset_size))
         random.seed(random_seed)
-        random.shuffle(indices)
+        # random.shuffle(indices)
         split = dataset_size - int(np.floor(validation_split * dataset_size))
         train_indices, val_indices = indices[:split], indices[split:]
         train_dataset = Subset(dataset, train_indices)
@@ -237,15 +237,15 @@ class Trainer(object):
                                  self.args.method, model_name)
 
         # Initialize WandB
-        wandb = WandB(name=model_name, config=cfg, init=True)
+        wandb = WandB(name=model_name, config=cfg, init=False)
 
         # Metrics before training.
         init_info = {'Train': {}, 'Test': {}}
-        train_metrics, test_metrics = self.evaluate()
-        init_info['Train'].update(train_metrics)
-        init_info['Test'].update(test_metrics)
-        wandb.update(info=init_info, epoch=0)
-        wandb.upload(commit=True)
+        # train_metrics, test_metrics = self.evaluate()
+        # init_info['Train'].update(train_metrics)
+        # init_info['Test'].update(test_metrics)
+        # wandb.update(info=init_info, epoch=0)
+        # wandb.upload(commit=True)
 
         print("Start Training!")
         for epoch in range(cfg.TRAIN.START_EPOCH, cfg.TRAIN.EPOCH):

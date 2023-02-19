@@ -233,6 +233,10 @@ def test_and_eval(tracker, test_loader, dataset: str):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='siamcar tracking')
+    parser.add_argument('--train_date', type=str, default='',
+                        help='Date on training')
+    parser.add_argument('--cfg_name', type=str, default='',
+                        help='Name of config yaml file')
     parser.add_argument('--model', type=str, default='', help='model to eval')
     parser.add_argument('--dataset', type=str,
                         default='', help='dataset name')

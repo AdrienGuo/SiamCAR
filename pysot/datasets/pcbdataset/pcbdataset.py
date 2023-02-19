@@ -169,6 +169,44 @@ class PCBDataset(Dataset):
                                             [anno[j][0], anno[j][1], anno[j][2], anno[j][3]])
                             box = np.stack(box).astype(np.float32)
                             searches.append(box)
+                    elif os.path.isfile(os.path.join(root, file[:-3]+"label")):
+                        f = open(os.path.join(
+                            root, file[:-3]+"label"), 'r')
+                        img = cv2.imread(img_path)
+                        imh, imw = img.shape[:2]
+                        lines = f.readlines()
+                        anno = list()
+                        for line in lines:
+                            line = line.strip('\n')
+                            line = line.split(',')
+                            line = list(line)
+                            anno.append(line)
+                        for i in range(len(anno)):
+                            if (float(anno[i][1]) > 0) and (float(anno[i][2]) > 0):
+                                item = img_path, anno[i][0]
+                                images.append(item)
+                                cx = float(
+                                    anno[i][1])+(float(anno[i][3])-float(anno[i][1]))/2
+                                cy = float(
+                                    anno[i][2])+(float(anno[i][4])-float(anno[i][2]))/2
+                                w = float(anno[i][3])-float(anno[i][1])
+                                h = float(anno[i][4])-float(anno[i][2])
+                                templates.append(
+                                    [cx/imw, cy/imh, w/imw, h/imh])
+                                box = list()
+                                for j in range(len(anno)):
+                                    if anno[j][0] == anno[i][0]:
+                                        cx = float(
+                                            anno[j][1])+(float(anno[j][3])-float(anno[j][1]))/2
+                                        cy = float(
+                                            anno[j][2])+(float(anno[j][4])-float(anno[j][2]))/2
+                                        w = float(anno[j][3])-float(anno[j][1])
+                                        h = float(anno[j][4])-float(anno[j][2])
+
+                                        box.append(
+                                            [cx/imw, cy/imh, w/imw, h/imh])
+                                box = np.stack(box).astype(np.float32)
+                                searches.append(box)
                     else:
                         # 影像對應的 annotation 不存在
                         assert False, f"ERROR, no annotation for image: {img_path}"
@@ -247,9 +285,9 @@ class PCBDataset(Dataset):
         save_img(z_img, template_path)
         # Draw gt_boxes on search image
         gt_image = draw_boxes(x_img, gt_boxes, type="gt")
-        z_gt_image = draw_boxes(gt_image, z_box, type="template")
+        # z_gt_image = draw_boxes(gt_image, z_box, type="template")
         search_path = os.path.join(search_dir, f"{idx}.jpg")
-        save_img(z_gt_image, search_path)
+        save_img(gt_image, search_path)
 
     def __getitem__(self, idx):
         # 加入 neg 的原因要去看 [DaSiamRPN](https://arxiv.org/pdf/1808.06048)
@@ -313,8 +351,9 @@ class PCBDataset(Dataset):
             z_box = gt_boxes
 
         # Save images to ./image_check
-        # self._save_img(img_name, img, z_img, x_img, z_box, gt_boxes, idx)
-        # ipdb.set_trace()
+        ipdb.set_trace()
+        self._save_img(img_name, img, z_img, x_img, z_box, gt_boxes, idx)
+        ipdb.set_trace()
 
         # Add one all zeros column to gt_boxes
         col_num = len(gt_boxes)

@@ -1,11 +1,12 @@
 BACKBONE:
-  TRAIN_EPOCH: 201  # edit
+  TRAIN_EPOCH: 10  # edit
+  PRETRAINED: './pretrained_models/resnet50.model'  # add
 
 TRAIN:
-  PRETRAINED: './pretrained_models/model_general.pth'  # add
-  EPOCH: 200  # edit
-  EVAL_FREQ: 2
-  SAVE_MODEL_FREQ: 4
+  EPOCH: 20  # edit
+  BATCH_SIZE: 20  # add
+  EVAL_FREQ: 1
+  SAVE_MODEL_FREQ: 20
 
   DATASET:
     TEMPLATE:

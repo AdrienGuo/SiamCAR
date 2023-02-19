@@ -97,8 +97,6 @@ class PCBCropCAR:
         img511, z_box511 = self.make_img511(
             img, z_box, out_size=511, padding=avg_chans)
 
-        """
-        """
         # 這個 avg_chans 會導致兩種補的 padding 顏色不一樣
         avg_chans = np.mean(img511, axis=(0, 1))
         # z_img: (127, 127, 3)

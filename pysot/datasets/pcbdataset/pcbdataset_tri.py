@@ -18,6 +18,7 @@ import ipdb
 import numpy as np
 import torch
 
+from pysot.core.config import cfg
 from pysot.datasets.augmentation.pcb_aug import PCBAugmentation
 from pysot.datasets.pcb_crop import get_pcb_crop
 from utils.file_organizer import create_dir, save_img
@@ -56,10 +57,8 @@ class PCBDatasetTri(object):
         pcb_crop = get_pcb_crop(args['method'])
         if args['method'] == "tri_origin":
             # zf_size_min: smallest z size after res50 backbone
-            zf_size_min = 10
+            zf_size_min = 4
             self.pcb_crop = pcb_crop(zf_size_min)
-        elif args['method'] == "tri_127_origin":
-            self.pcb_crop = pcb_crop()
         else:
             assert False, "Method is wrong"
 
@@ -170,7 +169,7 @@ class PCBDatasetTri(object):
 
         # Create virtual boxes
         z_box = np.array([[0, 0, z_img.shape[1], z_img.shape[0]]])
-        gt_boxes = np.array([[0, 0, 0, 0]])  # useless
+        gt_boxes = np.array([[0, 0, 0, 0, 0]])  # useless
 
         ##########################################
         # Step 2.
@@ -181,8 +180,8 @@ class PCBDatasetTri(object):
         )
 
         # CLAHE 3.0
-        z_img, z_box = self.z_aug(z_img, z_box)
-        x_img, gt_boxes = self.x_aug(x_img, gt_boxes)
+        # z_img, z_box = self.z_aug(z_img, z_box)
+        # x_img, gt_boxes = self.x_aug(x_img, gt_boxes)
 
         # self._save_img(img_path, z_img, x_img, idx)
         # ipdb.set_trace()
@@ -196,6 +195,14 @@ class PCBDatasetTri(object):
         z_img = torch.as_tensor(z_img, dtype=torch.float32)
         x_img = torch.as_tensor(x_img, dtype=torch.float32)
 
+        gt_boxes = torch.as_tensor(gt_boxes, dtype=torch.int64)
+
+        # useless
+        gt_cls = np.zeros(
+            (cfg.TRAIN.OUTPUT_SIZE, cfg.TRAIN.OUTPUT_SIZE), dtype=np.int64)
+        gt_cls = torch.as_tensor(gt_cls, dtype=torch.int64)
+
+        return img_name, img_path, z_img, x_img, z_box, gt_boxes, gt_cls
         return {
             'img_name': img_name,
             'z_img': z_img,

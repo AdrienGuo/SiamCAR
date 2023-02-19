@@ -195,7 +195,7 @@ if __name__ == "__main__":
 
     # Load model & Build tracker
     print(f"Loading model from: {args.model}")
-    model = ModelBuilder()
+    model = ModelBuilder(method=args.method)
     model = load_pretrain(model, args.model).cuda()
     model.eval()
     tracker = SiamCARTracker(model, cfg.TRACK)
@@ -217,11 +217,11 @@ if __name__ == "__main__":
 
     # Build dataset
     print("Building dataset...")
-    pcbdataset = get_pcbdataset(args.method)
-    dataset = pcbdataset(data_args, mode="test",
+    pcbdataset = get_pcbdataset(args.dataset)
+    dataset = pcbdataset(data_args, mode="evaluate",
                          augmentation=data_augmentation)
     assert len(dataset) != 0, "ERROR, dataset is empty!!"
-    print(f"Demo dataset size: {len(dataset)}")
+    print(f"Evaluate dataset size: {len(dataset)}")
     evaluate_loader = DataLoader(
         dataset,
         batch_size=1,

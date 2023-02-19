@@ -40,7 +40,7 @@ __C.TRAIN.EPOCH = 200
 __C.TRAIN.START_EPOCH = 0
 __C.TRAIN.BATCH_SIZE = 80
 __C.TRAIN.ACCUM_ITER = 1
-__C.TRAIN.NUM_WORKERS = 10
+__C.TRAIN.NUM_WORKERS = 0
 
 __C.TRAIN.MOMENTUM = 0.9
 __C.TRAIN.WEIGHT_DECAY = 0.0001
@@ -236,6 +236,8 @@ __C.TRACK.REGION_S = 0.1
 
 __C.TRACK.REGION_L = 0.44
 
+# Score threshold
+__C.TRACK.SCORE_THRESHOLD = 0.5
 
 # ------------------------------------------------------------------------ #
 # HP_SEARCH parameters

@@ -8,6 +8,8 @@ pcb_dataset = {
     'official_origin': PCBDataset,
     'tri_origin': PCBDatasetTri,
     'tri_127_origin': PCBDatasetTri,
+    'test': PCBDataset,
+    'PatternMatch_test': PCBDatasetTri
 }
 
 

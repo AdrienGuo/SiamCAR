@@ -18,7 +18,7 @@ class AdjustLayer(nn.Module):
 
     def forward(self, x, method):
         """
-        if method == "origin": 不要做裁切。
+        if "origin" in method: 不要做裁切。
         else: 會對 template 做裁切，方法如下：
             原文 (SiamRPN++)
             Thus we crop the center 7 × 7 regions [41] as the template
@@ -28,7 +28,7 @@ class AdjustLayer(nn.Module):
 
         x = self.downsample(x)
 
-        if method == "origin":
+        if "origin" in method:
             pass
         else:
             if x.size(3) < 20:

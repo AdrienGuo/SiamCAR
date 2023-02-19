@@ -48,16 +48,20 @@ class SiamCARTracker(SiameseTracker):
         bboxes_w = ltrbs[0, :, :] + ltrbs[2, :, :]
         bboxes_h = ltrbs[1, :, :] + ltrbs[3, :, :]
         # s_c: size change
-        s_c = self.change(self.sz(bboxes_w, bboxes_h) / self.sz(self.size[0] * self.scale_z, self.size[1] * self.scale_z))
+        s_c = self.change(self.sz(bboxes_w, bboxes_h) /
+                          self.sz(self.size[0] * self.scale_z, self.size[1] * self.scale_z))
         # TODO: 如果有旋轉的怎麼辦勒？
         # r_c: ratio change
-        r_c = self.change((self.size[0] / self.size[1]) / (bboxes_w / bboxes_h))
+        r_c = self.change(
+            (self.size[0] / self.size[1]) / (bboxes_w / bboxes_h))
         penalty = np.exp(-(r_c * s_c - 1) * penalty_lk)
         return penalty
 
     def accurate_location_up(self, max_r_up, max_c_up):
-        dist_h = int((self.x_img_h - (self.score_h - 1) * cfg.TRACK.STRIDE) / 2)  # 31
-        dist_w = int((self.x_img_w - (self.score_w - 1) * cfg.TRACK.STRIDE) / 2)  # 31
+        dist_h = int((self.x_img_h - (self.score_h - 1)
+                     * cfg.TRACK.STRIDE) / 2)  # 31
+        dist_w = int((self.x_img_w - (self.score_w - 1)
+                     * cfg.TRACK.STRIDE) / 2)  # 31
         max_r_up += dist_h  # r: row
         max_c_up += dist_w  # c: col
         p_cool_s = np.array([max_r_up, max_c_up])
@@ -69,8 +73,10 @@ class SiamCARTracker(SiameseTracker):
         # 因為是縮小的位置，所以要先放大 8 倍
         max_r = max_r * cfg.TRACK.STRIDE
         max_c = max_c * cfg.TRACK.STRIDE
-        dist_h = int((self.x_img_h - (self.score_h - 1) * cfg.TRACK.STRIDE) / 2)  # 31
-        dist_w = int((self.x_img_w - (self.score_w - 1) * cfg.TRACK.STRIDE) / 2)  # 31
+        dist_h = int((self.x_img_h - (self.score_h - 1)
+                     * cfg.TRACK.STRIDE) / 2)  # 31
+        dist_w = int((self.x_img_w - (self.score_w - 1)
+                     * cfg.TRACK.STRIDE) / 2)  # 31
         max_r += dist_h  # r: row
         max_c += dist_w  # c: col
         p_cool_s = np.array([max_r, max_c])
@@ -100,7 +106,8 @@ class SiamCARTracker(SiameseTracker):
         """
         upsize = (cfg.TRACK.SCORE_SIZE - 1) * cfg.TRACK.STRIDE + 1
         # 找 hp_score_up 裡面的 maximum 的 (i, j)
-        max_r_up_hp, max_c_up_hp = np.unravel_index(hp_score_up.argmax(), hp_score_up.shape)
+        max_r_up_hp, max_c_up_hp = np.unravel_index(
+            hp_score_up.argmax(), hp_score_up.shape)
         # 從 (upsize, upsize) 還原到 (size, size) 的位置上
         max_r = int(round(max_r_up_hp / scale_score))
         max_c = int(round(max_c_up_hp / scale_score))
@@ -111,14 +118,19 @@ class SiamCARTracker(SiameseTracker):
 
         min_bbox = int(cfg.TRACK.REGION_S * cfg.TRACK.EXEMPLAR_SIZE)
         max_bbox = int(cfg.TRACK.REGION_L * cfg.TRACK.EXEMPLAR_SIZE)
-        l_region = int(min(max_c_up_hp, bbox_clip(bbox_region[0], min_bbox, max_bbox)) / 2.0)
-        t_region = int(min(max_r_up_hp, bbox_clip(bbox_region[1], min_bbox, max_bbox)) / 2.0)
-        r_region = int(min(upsize - max_c_up_hp, bbox_clip(bbox_region[2], min_bbox, max_bbox)) / 2.0)
-        b_region = int(min(upsize - max_r_up_hp, bbox_clip(bbox_region[3], min_bbox, max_bbox)) / 2.0)
+        l_region = int(min(max_c_up_hp, bbox_clip(
+            bbox_region[0], min_bbox, max_bbox)) / 2.0)
+        t_region = int(min(max_r_up_hp, bbox_clip(
+            bbox_region[1], min_bbox, max_bbox)) / 2.0)
+        r_region = int(
+            min(upsize - max_c_up_hp, bbox_clip(bbox_region[2], min_bbox, max_bbox)) / 2.0)
+        b_region = int(
+            min(upsize - max_r_up_hp, bbox_clip(bbox_region[3], min_bbox, max_bbox)) / 2.0)
 
         mask = np.zeros_like(p_score_up)
         mask = np.ones_like(p_score_up)  # 原本的 code 沒有，亭儀加的
-        mask[max_r_up_hp - t_region: max_r_up_hp + b_region + 1, max_c_up_hp - l_region: max_c_up_hp + r_region + 1] = 1
+        mask[max_r_up_hp - t_region: max_r_up_hp + b_region + 1,
+             max_c_up_hp - l_region: max_c_up_hp + r_region + 1] = 1
         # mask[:, :] = 1
         p_score_up = p_score_up * mask
         return p_score_up
@@ -156,10 +168,13 @@ class SiamCARTracker(SiameseTracker):
             new_cx = disp_ori[1] + self.center_pos[0]
             new_cy = disp_ori[0] + self.center_pos[1]
 
-            ave_w = (ltrbs_up[max_r_up, max_c_up, 0] + ltrbs_up[max_r_up, max_c_up, 2]) / self.scale_z
-            ave_h = (ltrbs_up[max_r_up, max_c_up, 1] + ltrbs_up[max_r_up, max_c_up, 3]) / self.scale_z
+            ave_w = (ltrbs_up[max_r_up, max_c_up, 0] +
+                     ltrbs_up[max_r_up, max_c_up, 2]) / self.scale_z
+            ave_h = (ltrbs_up[max_r_up, max_c_up, 1] +
+                     ltrbs_up[max_r_up, max_c_up, 3]) / self.scale_z
             # s_c: size change
-            s_c = self.change(self.sz(ave_w, ave_h) / self.sz(self.size[0] * self.scale_z, self.size[1] * self.scale_z))
+            s_c = self.change(self.sz(
+                ave_w, ave_h) / self.sz(self.size[0] * self.scale_z, self.size[1] * self.scale_z))
             # TODO: 如果有旋轉的怎麼辦勒？
             # r_c: ratio change
             r_c = self.change((self.size[0] / self.size[1]) / (ave_w / ave_h))
@@ -199,7 +214,8 @@ class SiamCARTracker(SiameseTracker):
         for i in range(max(p_score_copy.shape[0], p_score_copy.shape[1])):
             # 找 p_score_copy 裡面的 maximum 的 (i, j)
             # 要注意這裡傳回來的是 “縮小 8 倍“ 的 index (因為不像上面有做 up)
-            max_r, max_c = np.unravel_index(p_score_copy.argmax(), p_score_copy.shape)
+            max_r, max_c = np.unravel_index(
+                p_score_copy.argmax(), p_score_copy.shape)
             scores.append(p_score_copy[max_r][max_c])
             # disp: 將座標軸改以 (x_img_h / 2, x_img_w / 2) 當作 (0, 0)
             disp = self.accurate_location(max_r, max_c)
@@ -209,10 +225,13 @@ class SiamCARTracker(SiameseTracker):
             new_cx = disp_ori[1] + self.center_pos[0]
             new_cy = disp_ori[0] + self.center_pos[1]
 
-            ave_w = (ltrbs[max_r, max_c, 0] + ltrbs[max_r, max_c, 2]) / self.scale_z
-            ave_h = (ltrbs[max_r, max_c, 1] + ltrbs[max_r, max_c, 3]) / self.scale_z
+            ave_w = (ltrbs[max_r, max_c, 0] +
+                     ltrbs[max_r, max_c, 2]) / self.scale_z
+            ave_h = (ltrbs[max_r, max_c, 1] +
+                     ltrbs[max_r, max_c, 3]) / self.scale_z
             # s_c: size change
-            s_c = self.change(self.sz(ave_w, ave_h) / self.sz(self.size[0] * self.scale_z, self.size[1] * self.scale_z))
+            s_c = self.change(self.sz(
+                ave_w, ave_h) / self.sz(self.size[0] * self.scale_z, self.size[1] * self.scale_z))
             # TODO: 如果有旋轉的怎麼辦勒？
             # r_c: ratio change
             r_c = self.change((self.size[0] / self.size[1]) / (ave_w / ave_h))
@@ -354,8 +373,6 @@ class SiamCARTracker(SiameseTracker):
         upsize_h = (self.score_h - 1) * cfg.TRACK.STRIDE + 1
         upsize_w = (self.score_w - 1) * cfg.TRACK.STRIDE + 1
 
-        # ipdb.set_trace()
-
         # 計算 (大小 & 長寬比) 的懲罰量
         penalty = self.cal_penalty(ltrbs, hp['penalty_k'])
         # 選擇不同的 p_score 計算方式
@@ -370,17 +387,22 @@ class SiamCARTracker(SiameseTracker):
         # hp_score: (score_h, score_w)
         if cfg.TRACK.hanming:
             # TODO: 這應該是不能加吧，變成越四周的分數越低，和我們的 task 不合
-            hp_score = p_score * (1 - hp['window_lr']) + self.window * hp['window_lr']
+            hp_score = p_score * \
+                (1 - hp['window_lr']) + self.window * hp['window_lr']
         else:
             hp_score = p_score
 
         # TODO: upsize_h, upsize_w 順序不能顛倒！！
         # upsize = (size - 1) * 8 + 1
-        hp_score_up = cv2.resize(hp_score, (upsize_h, upsize_w), interpolation=cv2.INTER_CUBIC)
-        p_score_up = cv2.resize(p_score, (upsize_h, upsize_w), interpolation=cv2.INTER_CUBIC)
-        cls_up = cv2.resize(cls, (upsize_h, upsize_w), interpolation=cv2.INTER_CUBIC)
+        hp_score_up = cv2.resize(
+            hp_score, (upsize_h, upsize_w), interpolation=cv2.INTER_CUBIC)
+        p_score_up = cv2.resize(
+            p_score, (upsize_h, upsize_w), interpolation=cv2.INTER_CUBIC)
+        cls_up = cv2.resize(cls, (upsize_h, upsize_w),
+                            interpolation=cv2.INTER_CUBIC)
         ltrbs = np.transpose(ltrbs, (1, 2, 0))  # ltrbs: (score_h, score_w, 4)
-        ltrbs_up = cv2.resize(ltrbs, (upsize_h, upsize_w), interpolation=cv2.INTER_CUBIC)
+        ltrbs_up = cv2.resize(ltrbs, (upsize_h, upsize_w),
+                              interpolation=cv2.INTER_CUBIC)
 
         scale_score = upsize_h / cfg.TRACK.SCORE_SIZE  # useless
 
@@ -416,7 +438,7 @@ class SiamCARTracker(SiameseTracker):
         for i in range(len(results)):
             box = bbox[results[i], :]
             score = rescore[results[i]]
-            if score >= 0.5:
+            if score >= cfg.TRACK.SCORE_THRESHOLD:
                 top_scores.append(score)
                 cx = box[0]
                 cy = box[1]
@@ -435,7 +457,7 @@ class SiamCARTracker(SiameseTracker):
                        height]
                 boxes.append(box)
             else:
-                # 分數 < 0.5 的忽略
+                # 分數小於 threshold 的忽略
                 continue
 
         return {
