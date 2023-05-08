@@ -81,7 +81,8 @@ def find_not_match_labels(directory: str, threshold: float):
                     # boxes_cls_map[cls].append(box)
                     boxes_cls_map[cls[i]].append(box)
 
-                invalid_boxes_cls_map = find_not_match_labels_one_img(img_path, boxes_cls_map, threshold)
+                invalid_boxes_cls_map = find_not_match_labels_one_img(
+                    img_path, boxes_cls_map, threshold)
                 if invalid_boxes_cls_map:
                     imgs.append(img_path)
                     invalid_labels.append(invalid_boxes_cls_map)
@@ -114,7 +115,7 @@ if __name__ == "__main__":
     parser.add_argument('--dataset_name', type=str, default='', help='dataset name')
     parser.add_argument('--dataset', type=str, default='', help='dataset')
     parser.add_argument('--cfg', type=str,
-                                 default='./experiments/siamcar_r50/config.yaml', help='configuration of tracking')
+                        default='./experiments/siamcar_r50/config.yaml', help='configuration of tracking')
     args = parser.parse_args()
 
     THRESHOLD = 0
@@ -123,7 +124,7 @@ if __name__ == "__main__":
     imgs, invalid_labels = find_not_match_labels(args.dataset, THRESHOLD)
 
     save_dir = os.path.join(
-        "./datasets", args.part, args.dataset_name, "visualization")
+        "./data", "TRI", args.part, args.dataset_name, "visualization")
     create_dir(save_dir)
     for img_path, invalid_boxes_cls_map in zip(imgs, invalid_labels):
         draw_not_match_labels_one_img(img_path, invalid_boxes_cls_map, save_dir)

@@ -1,5 +1,5 @@
 numpy
-opencv-python
+opencv-python-headless
 pyyaml
 yacs
 tqdm
@@ -7,3 +7,7 @@ colorama
 matplotlib
 cython
 tensorboardX
+openvino-dev==2021.4.2
+openvino==2021.4.2
+onnx
+ipdb

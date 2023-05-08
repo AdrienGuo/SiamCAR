@@ -1,0 +1,19 @@
+version: '3'
+
+services:
+  siamcar:
+    build: .
+    image: siamcar:siamcar
+    ipc: host
+    container_name: SiamCAR
+    working_dir: /workspace/SiamCAR
+    volumes:
+      - ./:/workspace/SiamCAR
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [ "gpu" ]
+              count: all
+    stdin_open: true
+    tty: true

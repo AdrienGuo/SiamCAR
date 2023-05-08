@@ -1,8 +1,7 @@
 # bin/bash
 
-part="test"
-dataset="all"
-
+part="train"
+dataset="_corrected_labels"
 
 echo "Part: ${part}"
 echo "Dataset: ${dataset}"
@@ -13,4 +12,4 @@ python3 \
     ./pysot/datasets/analysis/label.py \
     --part ${part} \
     --dataset_name ${dataset} \
-    --dataset ./datasets/${part}/${dataset} \
+    --dataset ./data/TRI/${part}/${dataset} \
