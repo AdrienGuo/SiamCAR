@@ -34,6 +34,7 @@ def cxcywh_to_x1y1wh(boxes):
 
 
 def find_not_match_labels_one_img(img_path: str, boxes_cls_map: dict, threshold: float):
+    print(f"img: {img_path}")
     invalid_boxes_cls_map = defaultdict(list)
     for cls, boxes in boxes_cls_map.items():
         max_area = 0
@@ -43,6 +44,8 @@ def find_not_match_labels_one_img(img_path: str, boxes_cls_map: dict, threshold:
             max_area = max(curr_area, max_area)
             min_area = min(curr_area, min_area)
         ratio = area_ratio(min_area, max_area)
+        print(f"Class: {cls}")
+        print(f"Ratio of area: {ratio}")
         if ratio > threshold:
             invalid_boxes_cls_map[cls] = boxes_cls_map[cls]
     return invalid_boxes_cls_map

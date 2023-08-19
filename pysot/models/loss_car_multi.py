@@ -251,7 +251,7 @@ class SiamCARLossComputation(object):
             # is_in_boxes = reg_targets_per_im.min(dim=2)[0] > 0
 
             # 不要整個 match_boxes 的區域都是 in_boxes
-            # 只留下最中心的 0.3 x 0.3 的區塊
+            # 只留下最中心的 0.4 x 0.4 的區塊
             # 可是要小心會不會變成完全沒有 in_boxes，因為我有些物件很小
             # RuntimeError: Integer division of tensors using div or / is no longer supported,
             # and in a future release div will perform true division as in Python 3.

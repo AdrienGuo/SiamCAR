@@ -1,6 +1,6 @@
 # bin/bash
 
-part="train"
+part="test"
 dataset="_corrected_labels"
 
 echo "Part: ${part}"
